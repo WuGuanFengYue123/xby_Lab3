@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Launch Main",
+      "request": "launch",
+      "mainClass": "com.team20.editor.Main",
+      "projectName": "text-editor",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "Debug (Attach)",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5005
+    },
+    {
+      "type": "java",
+      "name": "Launch with Maven",
+      "request": "launch",
+      "mainClass": "com.team20.editor.Main",
+      "projectName": "text-editor",
+      "preLaunchTask": "Maven: clean compile",
+      "console": "integratedTerminal"
+    }
+  ]
+}
