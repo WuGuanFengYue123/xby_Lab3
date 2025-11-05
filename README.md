@@ -75,7 +75,6 @@ verify_env.bat && build.bat run        # Windows
 .
 ├── build.bat
 ├── build.sh
-├── check_env.sh
 ├── .devcontainer/
 │   ├── devcontainer.json
 │   ├── Dockerfile
