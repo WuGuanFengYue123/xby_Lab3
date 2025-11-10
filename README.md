@@ -238,7 +238,7 @@ verify_env.bat && build.bat run        # Windows
 
 ---
 
-项目各主要分支简要说明（可复制粘贴）
+项目各主要分支简要说明
 
 - build.bat / build.sh  
   平台构建脚本（Windows / 类 Unix）。用于在不同操作系统上一键构建与运行项目。
