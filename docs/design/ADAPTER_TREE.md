@@ -13,6 +13,9 @@
 3. 不改已有任何类
 
 ## 节点层次建议
+
+```text
+
 Root
  ├── Workspace
  │    ├── Editors
@@ -25,5 +28,7 @@ Root
  └── Registry
       ├── EditorTypes
       └── CommandTypes
+
+```
 
 详见源码适配器实现。
