@@ -75,105 +75,289 @@ verify_env.bat && build.bat run        # Windows
 .
 ├── build.bat
 ├── build.sh
-├── .devcontainer/
-│   ├── devcontainer.json
-│   ├── Dockerfile
-│   ├── launch.json
-│   └── tasks.json
-├── docs/
-│   ├── api/
-│   ├── design/
-│   └── user-guide/
-├── .editorconfig
-├── .gitignore
-├── .mvn/
-│   └── wrapper/
-│       └── maven-wrapper.properties
+├── docs
+│   ├── api
+│   ├── design
+│   │   └── ADAPTER_TREE.md
+│   └── user-guide
 ├── mvnw
 ├── mvnw.cmd
 ├── pom.xml
 ├── README.md
-├── scripts/
+├── scripts
 ├── setup_env.bat
 ├── setup_env.sh
+├── setup_project_env.sh
 ├── setup_project.sh
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/
-│   │   │       └── team20/
-│   │   │           └── editor/
-│   │   │               ├── Main.java
-│   │   │               ├── core/
-│   │   │               │   ├── command/
-│   │   │               │   │   ├── Command.java
+├── src
+│   ├── main
+│   │   ├── java
+│   │   │   └── com
+│   │   │       └── team20
+│   │   │           └── editor
+│   │   │               ├── bootstrap
+│   │   │               │   └── ApplicationContext.java
+│   │   │               ├── domain
+│   │   │               │   ├── command
+│   │   │               │   │   ├── CommandDescriptor.java
 │   │   │               │   │   ├── CommandInvoker.java
-│   │   │               │   │   ├── UndoableCommand.java
-│   │   │               │   │   └── impl/
-│   │   │               │   │       ├── logging/
-│   │   │               │   │       │   ├── LogOffCommand.java
-│   │   │               │   │       │   ├── LogOnCommand.java
-│   │   │               │   │       │   └── LogShowCommand.java
-│   │   │               │   │       ├── text/
-│   │   │               │   │       │   ├── AppendCommand.java
-│   │   │               │   │       │   ├── DeleteCommand.java
-│   │   │               │   │       │   ├── InsertCommand.java
-│   │   │               │   │       │   ├── ReplaceCommand.java
-│   │   │               │   │       │   └── ShowCommand.java
-│   │   │               │   │       └── workspace/
-│   │   │               │   │           ├── CloseCommand.java
-│   │   │               │   │           ├── EditCommand.java
-│   │   │               │   │           ├── EditorListCommand.java
-│   │   │               │   │           ├── LoadCommand.java
-│   │   │               │   │           └── SaveCommand.java
-│   │   │               │   ├── editor/
+│   │   │               │   │   ├── Command.java
+│   │   │               │   │   ├── impl
+│   │   │               │   │   │   ├── logging
+│   │   │               │   │   │   │   ├── LoggingCommandProvider.java
+│   │   │               │   │   │   │   ├── LogOffCommand.java
+│   │   │               │   │   │   │   ├── LogOnCommand.java
+│   │   │               │   │   │   │   └── LogShowCommand.java
+│   │   │               │   │   │   ├── text
+│   │   │               │   │   │   │   ├── AppendCommand.java
+│   │   │               │   │   │   │   ├── DeleteCommand.java
+│   │   │               │   │   │   │   ├── InsertCommand.java
+│   │   │               │   │   │   │   ├── ReplaceCommand.java
+│   │   │               │   │   │   │   └── ShowCommand.java
+│   │   │               │   │   │   └── workspace
+│   │   │               │   │   │       ├── CloseCommand.java
+│   │   │               │   │   │       ├── EditCommand.java
+│   │   │               │   │   │       ├── EditorListCommand.java
+│   │   │               │   │   │       ├── LoadCommand.java
+│   │   │               │   │   │       └── SaveCommand.java
+│   │   │               │   │   ├── README.md
+│   │   │               │   │   ├── registry
+│   │   │               │   │   │   └── AutoLoadingCommandRegistry.java
+│   │   │               │   │   └── UndoableCommand.java
+│   │   │               │   ├── editor
 │   │   │               │   │   ├── AbstractEditor.java
 │   │   │               │   │   ├── Editor.java
-│   │   │               │   │   └── text/
+│   │   │               │   │   ├── README.md
+│   │   │               │   │   └── text
 │   │   │               │   │       ├── README.md
-│   │   │               │   │       └── TextEditor.java
-│   │   │               │   ├── event/
+│   │   │               │   │       ├── TextEditor.java
+│   │   │               │   │       └── TextEditorProvider.java
+│   │   │               │   └── workspace
+│   │   │               │       ├── README.md
+│   │   │               │       ├── Workspace.java
+│   │   │               │       ├── WorkspaceMemento.java
+│   │   │               │       └── WorkspaceState.java
+│   │   │               ├── extension
+│   │   │               │   ├── registry
+│   │   │               │   │   ├── AutoLoadingEditorRegistry.java
+│   │   │               │   │   ├── CommandRegistry.java
+│   │   │               │   │   ├── EditorFactory.java
+│   │   │               │   │   ├── EditorRegistry.java
+│   │   │               │   │   └── TextEditorFactory.java
+│   │   │               │   └── spi
+│   │   │               │       ├── command
+│   │   │               │       │   ├── CommandDescriptor.java
+│   │   │               │       │   └── CommandProvider.java
+│   │   │               │       ├── editor
+│   │   │               │       │   └── EditorProvider.java
+│   │   │               │       ├── node
+│   │   │               │       │   └── NodeAdapterProvider.java
+│   │   │               │       └── serialization
+│   │   │               │           └── SerializerProvider.java
+│   │   │               ├── infrastructure
+│   │   │               │   ├── event
 │   │   │               │   │   ├── CommandEvent.java
+│   │   │               │   │   ├── EventBus.java
 │   │   │               │   │   ├── Event.java
 │   │   │               │   │   ├── EventListener.java
 │   │   │               │   │   ├── EventPublisher.java
+│   │   │               │   │   ├── SimpleEventBus.java
 │   │   │               │   │   └── WorkspaceEvent.java
-│   │   │               │   ├── workspace/
-│   │   │               │   │   ├── README.md
-│   │   │               │   │   ├── Workspace.java
-│   │   │               │   │   ├── WorkspaceMemento.java
-│   │   │               │   │   └── WorkspaceState.java
-│   │   │               ├── logging/
-│   │   │               │   ├── Logger.java
-│   │   │               │   └── LogListener.java
-│   │   │               ├── persistence/
-│   │   │               │   ├── PersistenceManager.java
-│   │   │               │   └── Serializer.java
-│   │   │               ├── registry/
-│   │   │               │   ├── CommandRegistry.java
-│   │   │               │   ├── EditorFactory.java
-│   │   │               │   ├── EditorRegistry.java
-│   │   │               │   └── TextEditorFactory.java
-│   │   │               ├── ui/
-│   │   │               │   ├── CommandLineInterface.java
-│   │   │               │   ├── CommandParser.java
-│   │   │               │   └── OutputFormatter.java
-│   │   │               └── util/
+│   │   │               │   └── persistence
+│   │   │               │       ├── DefaultSerializerProvider.java
+│   │   │               │       ├── JsonSerializer.java
+│   │   │               │       ├── PersistenceManager.java
+│   │   │               │       └── Serializer.java
+│   │   │               ├── Main.java
+│   │   │               ├── monitoring
+│   │   │               │   └── logging
+│   │   │               │       ├── ConsoleLogSink.java
+│   │   │               │       ├── FileLogSink.java
+│   │   │               │       ├── Logger.java
+│   │   │               │       ├── LogListener.java
+│   │   │               │       └── LogSink.java
+│   │   │               ├── representation
+│   │   │               │   ├── tree
+│   │   │               │   │   ├── AbstractNodeAdapter.java
+│   │   │               │   │   ├── adapters
+│   │   │               │   │   │   ├── CommandTypeNodeAdapter.java
+│   │   │               │   │   │   ├── EditorNodeAdapter.java
+│   │   │               │   │   │   ├── RootNodeAdapter.java
+│   │   │               │   │   │   └── WorkspaceNodeAdapter.java
+│   │   │               │   │   ├── NodeAdapterFactory.java
+│   │   │               │   │   ├── Node.java
+│   │   │               │   │   ├── NodeTreeBuilder.java
+│   │   │               │   │   ├── NodeVisitor.java
+│   │   │               │   │   └── providers
+│   │   │               │   │       └── CoreNodeAdapterProvider.java
+│   │   │               │   └── ui
+│   │   │               │       ├── CommandLineInterface.java
+│   │   │               │       ├── CommandParser.java
+│   │   │               │       └── OutputFormatter.java
+│   │   │               └── util
 │   │   │                   ├── FileUtil.java
 │   │   │                   ├── StringUtil.java
 │   │   │                   └── ValidationUtil.java
-│   │   └── resources/
-│   │       ├── config/
-│   │       └── templates/
-│   └── test/
-│       ├── java/
-│       │   └── com/
-│       │       └── team20/
-│       │           └── editor/
+│   │   └── resources
+│   │       ├── config
+│   │       ├── META-INF
+│   │       │   └── services
+│   │       │       ├── com.team20.editor.extension.spi.command.CommandProvider
+│   │       │       ├── com.team20.editor.extension.spi.editor.EditorProvider
+│   │       │       ├── com.team20.editor.extension.spi.node.NodeAdapterProvider
+│   │       │       └── com.team20.editor.extension.spi.serialization.SerializerProvider
+│   │       └── templates
+│   └── test
+│       ├── java
+│       │   └── com
+│       │       └── team20
+│       │           └── editor
+│       │               ├── core
+│       │               │   ├── command
+│       │               │   │   └── impl
+│       │               │   │       ├── logging
+│       │               │   │       ├── text
+│       │               │   │       └── workspace
+│       │               │   ├── editor
+│       │               │   │   └── text
+│       │               │   ├── event
+│       │               │   └── workspace
+│       │               ├── logging
 │       │               ├── MainTest.java
-│       │               └── core/ editor/ event/ workspace/ … (测试包结构同 main)
-│       └── resources/
-├── target/                      # 构建输出（已被 .gitignore 忽略）
+│       │               ├── persistence
+│       │               ├── registry
+│       │               ├── ui
+│       │               └── util
+│       └── resources
+├── target
+│   ├── classes
+│   │   ├── com
+│   │   │   └── team20
+│   │   │       └── editor
+│   │   │           ├── bootstrap
+│   │   │           │   └── ApplicationContext.class
+│   │   │           ├── domain
+│   │   │           │   ├── command
+│   │   │           │   │   ├── Command.class
+│   │   │           │   │   ├── CommandDescriptor.class
+│   │   │           │   │   ├── CommandInvoker.class
+│   │   │           │   │   ├── impl
+│   │   │           │   │   │   ├── logging
+│   │   │           │   │   │   │   ├── LoggingCommandProvider.class
+│   │   │           │   │   │   │   ├── LogOffCommand.class
+│   │   │           │   │   │   │   ├── LogOnCommand.class
+│   │   │           │   │   │   │   └── LogShowCommand.class
+│   │   │           │   │   │   ├── text
+│   │   │           │   │   │   │   ├── AppendCommand.class
+│   │   │           │   │   │   │   ├── DeleteCommand.class
+│   │   │           │   │   │   │   ├── InsertCommand.class
+│   │   │           │   │   │   │   ├── ReplaceCommand.class
+│   │   │           │   │   │   │   └── ShowCommand.class
+│   │   │           │   │   │   └── workspace
+│   │   │           │   │   │       ├── CloseCommand.class
+│   │   │           │   │   │       ├── EditCommand.class
+│   │   │           │   │   │       ├── EditorListCommand.class
+│   │   │           │   │   │       ├── LoadCommand.class
+│   │   │           │   │   │       └── SaveCommand.class
+│   │   │           │   │   ├── registry
+│   │   │           │   │   │   └── AutoLoadingCommandRegistry.class
+│   │   │           │   │   └── UndoableCommand.class
+│   │   │           │   ├── editor
+│   │   │           │   │   ├── AbstractEditor.class
+│   │   │           │   │   ├── Editor.class
+│   │   │           │   │   └── text
+│   │   │           │   │       ├── TextEditor.class
+│   │   │           │   │       ├── TextEditorProvider$1.class
+│   │   │           │   │       └── TextEditorProvider.class
+│   │   │           │   └── workspace
+│   │   │           │       ├── Workspace.class
+│   │   │           │       ├── WorkspaceMemento.class
+│   │   │           │       └── WorkspaceState.class
+│   │   │           ├── extension
+│   │   │           │   ├── registry
+│   │   │           │   │   ├── AutoLoadingEditorRegistry.class
+│   │   │           │   │   ├── CommandRegistry.class
+│   │   │           │   │   ├── EditorFactory.class
+│   │   │           │   │   ├── EditorRegistry.class
+│   │   │           │   │   └── TextEditorFactory.class
+│   │   │           │   └── spi
+│   │   │           │       ├── command
+│   │   │           │       │   ├── CommandDescriptor.class
+│   │   │           │       │   └── CommandProvider.class
+│   │   │           │       ├── editor
+│   │   │           │       │   ├── EditorProvider$EditorRegistration$Factory.class
+│   │   │           │       │   ├── EditorProvider$EditorRegistration.class
+│   │   │           │       │   └── EditorProvider.class
+│   │   │           │       ├── node
+│   │   │           │       │   └── NodeAdapterProvider.class
+│   │   │           │       └── serialization
+│   │   │           │           └── SerializerProvider.class
+│   │   │           ├── infrastructure
+│   │   │           │   ├── event
+│   │   │           │   │   ├── CommandEvent.class
+│   │   │           │   │   ├── EventBus.class
+│   │   │           │   │   ├── Event.class
+│   │   │           │   │   ├── EventListener.class
+│   │   │           │   │   ├── EventPublisher.class
+│   │   │           │   │   ├── SimpleEventBus.class
+│   │   │           │   │   └── WorkspaceEvent.class
+│   │   │           │   └── persistence
+│   │   │           │       ├── DefaultSerializerProvider.class
+│   │   │           │       ├── JsonSerializer.class
+│   │   │           │       ├── PersistenceManager.class
+│   │   │           │       └── Serializer.class
+│   │   │           ├── Main$1.class
+│   │   │           ├── Main.class
+│   │   │           ├── monitoring
+│   │   │           │   └── logging
+│   │   │           │       ├── ConsoleLogSink.class
+│   │   │           │       ├── FileLogSink.class
+│   │   │           │       ├── Logger.class
+│   │   │           │       ├── LogListener.class
+│   │   │           │       ├── LogSink$LogLevel.class
+│   │   │           │       └── LogSink.class
+│   │   │           ├── representation
+│   │   │           │   ├── tree
+│   │   │           │   │   ├── AbstractNodeAdapter.class
+│   │   │           │   │   ├── adapters
+│   │   │           │   │   │   ├── CommandTypeNodeAdapter.class
+│   │   │           │   │   │   ├── EditorNodeAdapter.class
+│   │   │           │   │   │   ├── RootNodeAdapter.class
+│   │   │           │   │   │   └── WorkspaceNodeAdapter.class
+│   │   │           │   │   ├── NodeAdapterFactory$NodeAdaptContext.class
+│   │   │           │   │   ├── NodeAdapterFactory.class
+│   │   │           │   │   ├── Node.class
+│   │   │           │   │   ├── NodeTreeBuilder.class
+│   │   │           │   │   ├── NodeVisitor.class
+│   │   │           │   │   └── providers
+│   │   │           │   │       ├── CoreNodeAdapterProvider$1.class
+│   │   │           │   │       ├── CoreNodeAdapterProvider$2.class
+│   │   │           │   │       ├── CoreNodeAdapterProvider$3$1.class
+│   │   │           │   │       ├── CoreNodeAdapterProvider$3.class
+│   │   │           │   │       └── CoreNodeAdapterProvider.class
+│   │   │           │   └── ui
+│   │   │           │       ├── CommandLineInterface.class
+│   │   │           │       ├── CommandParser$ParsedCommand.class
+│   │   │           │       ├── CommandParser.class
+│   │   │           │       └── OutputFormatter.class
+│   │   │           └── util
+│   │   │               ├── FileUtil.class
+│   │   │               ├── StringUtil.class
+│   │   │               └── ValidationUtil.class
+│   │   └── META-INF
+│   │       └── services
+│   │           ├── com.team20.editor.extension.spi.command.CommandProvider
+│   │           ├── com.team20.editor.extension.spi.editor.EditorProvider
+│   │           ├── com.team20.editor.extension.spi.node.NodeAdapterProvider
+│   │           └── com.team20.editor.extension.spi.serialization.SerializerProvider
+│   ├── generated-sources
+│   │   └── annotations
+│   └── maven-status
+│       └── maven-compiler-plugin
+│           └── compile
+│               └── default-compile
+│                   ├── createdFiles.lst
+│                   └── inputFiles.lst
 ├── verify_env.bat
 ├── verify_env.sh
 ├── 设计模式_lab1.md
