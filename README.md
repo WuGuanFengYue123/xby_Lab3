@@ -230,134 +230,6 @@ verify_env.bat && build.bat run        # Windows
 │       │               └── util
 │       └── resources
 ├── target
-│   ├── classes
-│   │   ├── com
-│   │   │   └── team20
-│   │   │       └── editor
-│   │   │           ├── bootstrap
-│   │   │           │   └── ApplicationContext.class
-│   │   │           ├── domain
-│   │   │           │   ├── command
-│   │   │           │   │   ├── Command.class
-│   │   │           │   │   ├── CommandDescriptor.class
-│   │   │           │   │   ├── CommandInvoker.class
-│   │   │           │   │   ├── impl
-│   │   │           │   │   │   ├── logging
-│   │   │           │   │   │   │   ├── LoggingCommandProvider.class
-│   │   │           │   │   │   │   ├── LogOffCommand.class
-│   │   │           │   │   │   │   ├── LogOnCommand.class
-│   │   │           │   │   │   │   └── LogShowCommand.class
-│   │   │           │   │   │   ├── text
-│   │   │           │   │   │   │   ├── AppendCommand.class
-│   │   │           │   │   │   │   ├── DeleteCommand.class
-│   │   │           │   │   │   │   ├── InsertCommand.class
-│   │   │           │   │   │   │   ├── ReplaceCommand.class
-│   │   │           │   │   │   │   └── ShowCommand.class
-│   │   │           │   │   │   └── workspace
-│   │   │           │   │   │       ├── CloseCommand.class
-│   │   │           │   │   │       ├── EditCommand.class
-│   │   │           │   │   │       ├── EditorListCommand.class
-│   │   │           │   │   │       ├── LoadCommand.class
-│   │   │           │   │   │       └── SaveCommand.class
-│   │   │           │   │   ├── registry
-│   │   │           │   │   │   └── AutoLoadingCommandRegistry.class
-│   │   │           │   │   └── UndoableCommand.class
-│   │   │           │   ├── editor
-│   │   │           │   │   ├── AbstractEditor.class
-│   │   │           │   │   ├── Editor.class
-│   │   │           │   │   └── text
-│   │   │           │   │       ├── TextEditor.class
-│   │   │           │   │       ├── TextEditorProvider$1.class
-│   │   │           │   │       └── TextEditorProvider.class
-│   │   │           │   └── workspace
-│   │   │           │       ├── Workspace.class
-│   │   │           │       ├── WorkspaceMemento.class
-│   │   │           │       └── WorkspaceState.class
-│   │   │           ├── extension
-│   │   │           │   ├── registry
-│   │   │           │   │   ├── AutoLoadingEditorRegistry.class
-│   │   │           │   │   ├── CommandRegistry.class
-│   │   │           │   │   ├── EditorFactory.class
-│   │   │           │   │   ├── EditorRegistry.class
-│   │   │           │   │   └── TextEditorFactory.class
-│   │   │           │   └── spi
-│   │   │           │       ├── command
-│   │   │           │       │   ├── CommandDescriptor.class
-│   │   │           │       │   └── CommandProvider.class
-│   │   │           │       ├── editor
-│   │   │           │       │   ├── EditorProvider$EditorRegistration$Factory.class
-│   │   │           │       │   ├── EditorProvider$EditorRegistration.class
-│   │   │           │       │   └── EditorProvider.class
-│   │   │           │       ├── node
-│   │   │           │       │   └── NodeAdapterProvider.class
-│   │   │           │       └── serialization
-│   │   │           │           └── SerializerProvider.class
-│   │   │           ├── infrastructure
-│   │   │           │   ├── event
-│   │   │           │   │   ├── CommandEvent.class
-│   │   │           │   │   ├── EventBus.class
-│   │   │           │   │   ├── Event.class
-│   │   │           │   │   ├── EventListener.class
-│   │   │           │   │   ├── EventPublisher.class
-│   │   │           │   │   ├── SimpleEventBus.class
-│   │   │           │   │   └── WorkspaceEvent.class
-│   │   │           │   └── persistence
-│   │   │           │       ├── DefaultSerializerProvider.class
-│   │   │           │       ├── JsonSerializer.class
-│   │   │           │       ├── PersistenceManager.class
-│   │   │           │       └── Serializer.class
-│   │   │           ├── Main$1.class
-│   │   │           ├── Main.class
-│   │   │           ├── monitoring
-│   │   │           │   └── logging
-│   │   │           │       ├── ConsoleLogSink.class
-│   │   │           │       ├── FileLogSink.class
-│   │   │           │       ├── Logger.class
-│   │   │           │       ├── LogListener.class
-│   │   │           │       ├── LogSink$LogLevel.class
-│   │   │           │       └── LogSink.class
-│   │   │           ├── representation
-│   │   │           │   ├── tree
-│   │   │           │   │   ├── AbstractNodeAdapter.class
-│   │   │           │   │   ├── adapters
-│   │   │           │   │   │   ├── CommandTypeNodeAdapter.class
-│   │   │           │   │   │   ├── EditorNodeAdapter.class
-│   │   │           │   │   │   ├── RootNodeAdapter.class
-│   │   │           │   │   │   └── WorkspaceNodeAdapter.class
-│   │   │           │   │   ├── NodeAdapterFactory$NodeAdaptContext.class
-│   │   │           │   │   ├── NodeAdapterFactory.class
-│   │   │           │   │   ├── Node.class
-│   │   │           │   │   ├── NodeTreeBuilder.class
-│   │   │           │   │   ├── NodeVisitor.class
-│   │   │           │   │   └── providers
-│   │   │           │   │       ├── CoreNodeAdapterProvider$1.class
-│   │   │           │   │       ├── CoreNodeAdapterProvider$2.class
-│   │   │           │   │       ├── CoreNodeAdapterProvider$3$1.class
-│   │   │           │   │       ├── CoreNodeAdapterProvider$3.class
-│   │   │           │   │       └── CoreNodeAdapterProvider.class
-│   │   │           │   └── ui
-│   │   │           │       ├── CommandLineInterface.class
-│   │   │           │       ├── CommandParser$ParsedCommand.class
-│   │   │           │       ├── CommandParser.class
-│   │   │           │       └── OutputFormatter.class
-│   │   │           └── util
-│   │   │               ├── FileUtil.class
-│   │   │               ├── StringUtil.class
-│   │   │               └── ValidationUtil.class
-│   │   └── META-INF
-│   │       └── services
-│   │           ├── com.team20.editor.extension.spi.command.CommandProvider
-│   │           ├── com.team20.editor.extension.spi.editor.EditorProvider
-│   │           ├── com.team20.editor.extension.spi.node.NodeAdapterProvider
-│   │           └── com.team20.editor.extension.spi.serialization.SerializerProvider
-│   ├── generated-sources
-│   │   └── annotations
-│   └── maven-status
-│       └── maven-compiler-plugin
-│           └── compile
-│               └── default-compile
-│                   ├── createdFiles.lst
-│                   └── inputFiles.lst
 ├── verify_env.bat
 ├── verify_env.sh
 ├── 设计模式_lab1.md
@@ -365,3 +237,41 @@ verify_env.bat && build.bat run        # Windows
 ```
 
 ---
+
+项目各主要分支简要说明
+
+- build.bat / build.sh  
+  平台构建脚本（Windows / 类 Unix）。用于在不同操作系统上一键构建与运行项目。
+
+- docs/  
+  项目文档：包含设计（design）、API 文档（api）与用户指南（user-guide），便于新成员阅读架构与使用说明。
+
+  - design/ADAPTER_TREE.md  
+    说明如何把域对象适配为统一的树形 Node（Adapter + Composite），便于 UI 展示与扩展。
+
+- mvnw / mvnw.cmd & pom.xml  
+  Maven wrapper 与构建配置，保证在任意环境用固定的 Maven 版本构建与打包。
+
+- src/main/java/com/team20/editor/bootstrap/ApplicationContext.java  
+  应用上下文与装配点：通过 ServiceLoader 加载 Provider、组装 CommandRegistry、EditorRegistry、EventBus、LogSink 与 Serializer 等运行时组件。
+
+- src/main/java/com/team20/editor/domain/**  
+  领域模型（命令 / 编辑器 / 工作区）与核心接口。业务逻辑应尽量放在 domain 层并保持稳定契约。
+
+- src/main/java/com/team20/editor/extension/**  
+  扩展点（registry / spi）实现：所有可插拔的 Provider 接口与注册中心，支持通过添加类与 META-INF/services 文件扩展系统而无需修改核心代码（符合 OCP）。
+
+- src/main/java/com/team20/editor/infrastructure/**  
+  基础设施实现：事件总线、持久化、序列化器等底层实现，domain 层通过接口依赖这些实现（符合 DIP）。
+
+- src/main/java/com/team20/editor/monitoring/logging/**  
+  日志/监控扩展点：LogSink、ConsoleLogSink、FileLogSink 与 LogListener（可订阅 EventBus 事件进行日志记录）。
+
+- src/main/java/com/team20/editor/representation/tree/**  
+  视图模型与适配器（Node、NodeAdapterFactory、NodeTreeBuilder、各类 Adapter），实现 Adapter + Composite，用于构建统一的树形表示以供 UI/CLI 展示。
+
+- src/main/java/com/team20/editor/representation/ui/**  
+  CLI 相关实现（命令行解析、输出格式化），将用户输入映射到 Command 并执行。
+
+- src/main/resources/META-INF/services/**  
+  ServiceLoader 的资源定义文件（文件名为接口完全限定名），用于在运行时自动发现并加载实现类（例如 CommandProvider、EditorProvider、SerializerProvider、NodeAdapterProvider）。
