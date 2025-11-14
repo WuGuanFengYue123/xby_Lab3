@@ -1,21 +1,24 @@
 package com.team20.editor.domain.command;
 
+import com.team20.editor.domain.workspace.Workspace;
+
 /**
- * 可撤销命令接口
- * 
- * 继承自 Command，增加 undo 功能
+ * 可撤销命令接口，扩展自 Command。
+ *
+ * 规范：
+ * - execute/undo/redo 都接收 Workspace 上下文。
  */
 public interface UndoableCommand extends Command {
+    @Override
+    void execute(Workspace workspace);
 
     /**
-     * 撤销命令
+     * 撤销上一次 execute 的效果（在相同的 Workspace 上恢复）。
      */
-    void undo();
+    void undo(Workspace workspace);
 
     /**
-     * 判断命令是否可撤销
-     * 
-     * @return true 如果可撤销
+     * 重做（重新应用被撤销的操作）。
      */
-    boolean isUndoable();
+    void redo(Workspace workspace);
 }

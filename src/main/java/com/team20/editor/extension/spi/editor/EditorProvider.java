@@ -1,18 +1,23 @@
 package com.team20.editor.extension.spi.editor;
 
 import com.team20.editor.domain.editor.Editor;
-import java.util.Collection;
 
+/**
+ * 编辑器提供者接口（SPI）
+ */
 public interface EditorProvider {
-    Collection<EditorRegistration> editors();
+    /**
+     * 获取支持的文件扩展名（如 "txt", "xml"）
+     */
+    String getSupportedExtension();
 
-    record EditorRegistration(String type, Factory factory, String description) {
-        public interface Factory {
-            Editor create();
-        }
+    /**
+     * 创建编辑器实例
+     */
+    Editor createEditor(String filepath);
 
-        public static EditorRegistration of(String type, Factory factory, String description) {
-            return new EditorRegistration(type, factory, description);
-        }
-    }
+    /**
+     * 编辑器类型名称
+     */
+    String getEditorType();
 }

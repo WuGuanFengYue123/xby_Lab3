@@ -1,42 +1,76 @@
 package com.team20.editor.domain.command.impl.text;
 
-import com.team20.editor.domain.command.Command;
-import com.team20.editor.domain.editor.Editor;
+import com.team20.editor.domain.command.UndoableCommand;
 import com.team20.editor.domain.editor.text.TextEditor;
+import com.team20.editor.domain.workspace.Workspace;
 
 /**
- * Delete operation (simple placeholder).
+ * 删除文本命令
  */
-public class DeleteCommand implements Command {
+public class DeleteCommand implements UndoableCommand {
 
-    private final Editor editor;
+    private final int line;
+    private final int col;
     private final int length;
+    private TextEditor.EditorSnapshot beforeSnapshot;
 
-    public DeleteCommand(Editor editor, int length) {
-        this.editor = editor;
+    public DeleteCommand(int line, int col, int length) {
+        if (line < 1 || col < 1) {
+            throw new IllegalArgumentException("行号和列号必须从 1 开始");
+        }
+        if (length < 0) {
+            throw new IllegalArgumentException("删除长度不能为负数");
+        }
+        this.line = line;
+        this.col = col;
         this.length = length;
     }
 
-    public DeleteCommand() {
-        this.editor = null;
-        this.length = 0;
+    @Override
+    public void execute(Workspace workspace) {
+        TextEditor editor = getTextEditor(workspace);
+
+        beforeSnapshot = editor.createSnapshot();
+        editor.delete(line, col, length);
+
+        workspace.publishCommandEvent("delete",
+                String.format("%d:%d %d", line, col, length));
     }
 
     @Override
-    public void execute() {
-        if (editor instanceof TextEditor te) {
-            String content = te.getContent();
-            if (content != null && content.length() > 0) {
-                int newLen = Math.max(0, content.length() - length);
-                // naive delete: replace buffer by substring
-                // TextEditor only exposes append()/getContent() in current API,
-                // so we fallback to printing (or extend TextEditor if needed).
-                System.out.println("[DeleteCommand] requested delete, but TextEditor lacks remove API in this demo");
-            } else {
-                System.out.println("[DeleteCommand] nothing to delete");
-            }
-        } else {
-            System.out.println("[DeleteCommand] skipped (no TextEditor)");
+    public void undo(Workspace workspace) {
+        if (beforeSnapshot == null) {
+            throw new IllegalStateException("无法撤销：命令尚未执行");
         }
+
+        TextEditor editor = getTextEditor(workspace);
+        editor.restoreSnapshot(beforeSnapshot);
+
+        workspace.publishCommandEvent("undo", "delete");
+    }
+
+    @Override
+    public void redo(Workspace workspace) {
+        TextEditor editor = getTextEditor(workspace);
+        TextEditor.EditorSnapshot temp = beforeSnapshot;
+        execute(workspace);
+        beforeSnapshot = temp;
+
+        workspace.publishCommandEvent("redo", "delete");
+    }
+
+    private TextEditor getTextEditor(Workspace workspace) {
+        if (workspace.getActiveEditor() == null) {
+            throw new IllegalStateException("没有打开的文件");
+        }
+        if (!(workspace.getActiveEditor() instanceof TextEditor)) {
+            throw new IllegalStateException("当前文件不是文本文件");
+        }
+        return (TextEditor) workspace.getActiveEditor();
+    }
+
+    @Override
+    public String toString() {
+        return String.format("delete %d:%d %d", line, col, length);
     }
 }
