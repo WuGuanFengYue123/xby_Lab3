@@ -1,9 +1,10 @@
 package com.team20.editor.infrastructure.event;
 
-public interface EventBus {
-    <E extends Event> void subscribe(Class<E> type, EventListener<E> listener);
+/**
+ * 事件总线接口
+ */
+public interface EventBus extends EventPublisher {
+    void subscribe(EventListener listener);
 
-    void publish(Event event);
-
-    int listenerCount(Class<?> type);
+    void unsubscribe(EventListener listener);
 }

@@ -8,6 +8,44 @@ For course: *Advanced Software Development Techniques 25*
 
 ---
 
+#  实现进度
+```text
+### 命令速查表 
+
+#### 工作区命令
+| 命令 | 功能 | 必需参数 | 可选参数 |
+|------|------|---------|---------|
+| ✅`load <file>` | 加载文件 | 文件路径 | - | 
+| ✅`save [file\|all]` | 保存文件 | - | file/all |  
+| ⌛️`init <file> [with-log]` | 创建新缓冲区 | 文件 | with-log |
+| ⌛️`close [file]` | 关闭文件 | - | file |
+| ✅`edit <file>` | 切换活动文件 | 文件 | - |
+| ✅`editor-list` | 显示文件列表 | - | - |
+| ⌛️`dir-tree [path]` | 显示目录树 | - | path | 
+| ✅`undo` | 撤销 | - | - |
+| ✅`redo` | 重做 | - | - |
+| ✅`exit` | 退出程序 | - | - | 
+
+#### 文本编辑命令
+
+| 命令                              | 功能     | 适用文件 |
+| --------------------------------- | -------- | -------- |
+| ✅`append "text"`                   | 追加文本 | .txt     |
+| ✅`insert <line:col> "text"`        | 插入文本 | .txt     |
+| ✅`delete <line:col> <len>`         | 删除字符 | .txt     |
+| ✅`replace <line:col> <len> "text"` | 替换文本 | .txt     |
+| ✅`show [start:end]`                | 显示内容 | .txt     |
+
+#### 日志命令
+
+| 命令              | 功能     |
+| ----------------- | -------- |
+| ⌛️`log-on [file]`   | 启用日志 |
+| ⌛️`log-off [file]`  | 关闭日志 |
+| ⌛️`log-show [file]` | 显示日志 |
+
+```
+
 ## 🚀 快速开始（3 步）
 
 ### 所有平台通用
