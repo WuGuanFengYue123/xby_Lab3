@@ -11,13 +11,21 @@ import com.team20.editor.representation.tree.adapters.CommandTypeNodeAdapter;
 import com.team20.editor.representation.tree.adapters.EditorNodeAdapter;
 import com.team20.editor.representation.tree.adapters.WorkspaceNodeAdapter;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Core node adapter provider — adapt to the unified NodeAdapterProvider API.
+ */
 public class CoreNodeAdapterProvider implements NodeAdapterProvider {
+
     @Override
-    public Collection<NodeAdapterFactory> factories() {
+    public String getName() {
+        return "core-node-adapter";
+    }
+
+    @Override
+    public List<NodeAdapterFactory> getAdapterFactories() {
         return List.of(
                 new NodeAdapterFactory() {
                     @Override
@@ -50,11 +58,11 @@ public class CoreNodeAdapterProvider implements NodeAdapterProvider {
                     @Override
                     public Node adapt(Object source, NodeAdaptContext ctx) {
                         AutoLoadingCommandRegistry reg = (AutoLoadingCommandRegistry) source;
-                        List<Node> children = reg.names().stream()
+                        List<Node> children = reg.getCommandNames().stream()
                                 .map(name -> {
-                                    CommandDescriptor d = reg.descriptor(name).orElse(null);
-                                    String desc = d == null ? "" : d.description();
-                                    return (Node) new CommandTypeNodeAdapter(name, desc);
+                                    String desc = reg.getCommandDescription(name);
+                                    String d = desc == null ? "" : desc;
+                                    return (Node) new CommandTypeNodeAdapter(name, d);
                                 }).collect(Collectors.toList());
                         // 用 WorkspaceNodeAdapter 作为聚合容器（轻量 hack）
                         return new WorkspaceNodeAdapter(new Workspace()) {

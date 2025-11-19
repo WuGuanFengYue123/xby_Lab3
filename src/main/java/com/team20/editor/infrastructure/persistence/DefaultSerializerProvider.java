@@ -1,16 +1,16 @@
 package com.team20.editor.infrastructure.persistence;
 
-import java.util.Collection;
-import java.util.List;
-
 import com.team20.editor.extension.spi.serialization.SerializerProvider;
 
 /**
- * 默认序列化提供者（目前只有 JSON，后续新增 XML/YAML 只加新 Provider）。
+ * Default serializer provider - adapts the project-local JsonSerializer to the SPI.
+ *
+ * Note: this class still returns a concrete JsonSerializer instance but now implements the SPI method.
+ * If you later want no built-in implementations at all, move this class out into a plugin module.
  */
 public class DefaultSerializerProvider implements SerializerProvider {
     @Override
-    public Collection<Serializer> serializers() {
-        return List.of(new JsonSerializer());
+    public Serializer getSerializer() {
+        return new JsonSerializer();
     }
 }

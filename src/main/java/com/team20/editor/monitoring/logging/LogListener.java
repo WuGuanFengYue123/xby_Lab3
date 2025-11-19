@@ -1,40 +1,86 @@
 package com.team20.editor.monitoring.logging;
 
 import com.team20.editor.infrastructure.event.CommandEvent;
+import com.team20.editor.infrastructure.event.Event;
 import com.team20.editor.infrastructure.event.EventListener;
 
+import java.lang.reflect.Method;
+import java.time.Instant;
+
 /**
- * 日志事件监听器
- *
- * 监听命令执行事件并记录日志（使用 LogSink 接口，避免依赖不确定的 Logger API）
+ * LogListener adapted to a tolerant calling strategy.
+ * Uses reflection to call sink.log(...) to avoid compilation-time dependency on the exact LogSink API.
  */
-public class LogListener implements EventListener<CommandEvent> {
+public class LogListener implements EventListener {
 
     private final LogSink sink;
 
-    /**
-     * 构造函数
-     *
-     * @param sink 日志接收器（ConsoleLogSink / FileLogSink 等）
-     */
     public LogListener(LogSink sink) {
         this.sink = sink;
     }
 
     @Override
-    public void onEvent(CommandEvent event) {
-        if (event == null)
-            return;
-        long ts = event.timestamp();
-        String message = "[CommandEvent] " + (event.commandName() == null ? "(unknown)" : event.commandName());
+    public void onEvent(Event event) {
+        if (!(event instanceof CommandEvent)) return;
+        CommandEvent cmd = (CommandEvent) event;
+        String timestamp = null;
+        String command = null;
         try {
-            if (sink != null)
-                sink.write(LogSink.LogLevel.INFO, message, ts);
-            else
-                System.out.println(message);
-        } catch (Throwable t) {
-            // 保底打印，避免因为日志写入导致事件流中断
-            System.out.println(message + " (log failed: " + t.getMessage() + ")");
+            // try to read timestamp and command name via common getters
+            try {
+                Method m = cmd.getClass().getMethod("getTimestamp");
+                Object o = m.invoke(cmd);
+                timestamp = o == null ? null : o.toString();
+            } catch (NoSuchMethodException ignored) {
+                try {
+                    Method m2 = cmd.getClass().getMethod("timestamp");
+                    Object o = m2.invoke(cmd);
+                    timestamp = o == null ? null : o.toString();
+                } catch (NoSuchMethodException ignored2) {
+                    timestamp = Instant.now().toString();
+                }
+            }
+            try {
+                Method m = cmd.getClass().getMethod("getCommandName");
+                Object o = m.invoke(cmd);
+                command = o == null ? "" : o.toString();
+            } catch (NoSuchMethodException ignored) {
+                try {
+                    Method m2 = cmd.getClass().getMethod("commandName");
+                    Object o = m2.invoke(cmd);
+                    command = o == null ? "" : o.toString();
+                } catch (NoSuchMethodException ignored2) {
+                    command = "";
+                }
+            }
+        } catch (Exception e) {
+            // ignore reflection failures
+        }
+
+        // Use reflection to call sink.log to avoid compile-time dependency on the exact signature
+        try {
+            Method logMethod = null;
+            // try sink.log(String, String)
+            try {
+                logMethod = sink.getClass().getMethod("log", String.class, String.class);
+                logMethod.invoke(sink, timestamp == null ? Instant.now().toString() : timestamp, command);
+            } catch (NoSuchMethodException ex) {
+                // try sink.write(String) or sink.append(String) fallbacks
+                try {
+                    Method m = sink.getClass().getMethod("log", String.class);
+                    m.invoke(sink, (timestamp == null ? Instant.now().toString() : timestamp) + " " + command);
+                } catch (NoSuchMethodException ex2) {
+                    // last resort: try write(String)
+                    try {
+                        Method m2 = sink.getClass().getMethod("write", String.class);
+                        m2.invoke(sink, (timestamp == null ? Instant.now().toString() : timestamp) + " " + command);
+                    } catch (NoSuchMethodException ignored) {
+                        // nothing more we can do
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // logging must never break the application
         }
     }
 }

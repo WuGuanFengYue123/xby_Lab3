@@ -4,8 +4,8 @@ import com.team20.editor.bootstrap.ApplicationContext;
 import com.team20.editor.domain.command.Command;
 import com.team20.editor.domain.command.UndoableCommand;
 import com.team20.editor.domain.command.impl.text.*;
-import com.team20.editor.domain.command.impl.workpace.*;
 import com.team20.editor.domain.command.impl.workspace.*;
+import com.team20.editor.domain.editor.Editor;
 import com.team20.editor.domain.editor.text.TextEditor;
 import com.team20.editor.domain.workspace.Workspace;
 
@@ -16,9 +16,8 @@ import java.util.Scanner;
  * 程序入口（CLI 主循环）
  *
  * 说明：
- * - parseCommand 现在需要 ApplicationContext，以便创建带依赖的命令（如 Save/Load/Edit/Undo/Redo）
- * - runInteractiveLoop 在执行命令时会检查命令是否为 UndoableCommand，如果是则通过 CommandInvoker
- * 执行并记录历史
+ * - parseCommand 现在使用 ApplicationContext.editorFactory() / persistenceManager() 创建命令实例，
+ *   从而确保 Editor 实例由 SPI 提供。
  */
 public final class Main {
 
@@ -101,7 +100,7 @@ public final class Main {
         try {
             switch (commandName) {
                 case "init":
-                    return parseInitCommand(args, workspace);
+                    return parseInitCommand(args, workspace, context);
                 case "append":
                     return new AppendCommand(extractQuotedText(args));
                 case "insert":
@@ -114,29 +113,24 @@ public final class Main {
                     return parseShowCommand(args);
                 case "status":
                     return createStatusCommand(workspace);
-                // file & workspace operations (use context.persistenceManager() and
-                // context.commandInvoker())
+                // file & workspace operations (use context.editorFactory() and context.persistenceManager())
                 case "save":
-                    // save [filepath]
                     String savePath = args.isBlank() ? null : args.trim();
                     return new SaveCommand(context.persistenceManager(), savePath);
                 case "load":
-                    // load <filepath>
                     if (args.isBlank()) {
                         throw new IllegalArgumentException("load 需要参数：load <filepath>");
                     }
-                    return new LoadCommand(context.persistenceManager(), args.trim());
+                    return new LoadCommand(context.editorFactory(), context.persistenceManager(), args.trim());
                 case "edit":
                     if (args.isBlank()) {
                         throw new IllegalArgumentException("edit 需要参数：edit <filepath>");
                     }
-                    return new EditCommand(context.persistenceManager(), args.trim());
+                    return new EditCommand(context.editorFactory(), context.persistenceManager(), args.trim());
                 case "close":
                     String closePath = args.isBlank() ? null : args.trim();
                     return new CloseCommand(closePath);
                 case "undo":
-                    // Undo is performed via invoker; represent as a simple command that calls
-                    // invoker.undo
                     return new Command() {
                         @Override
                         public void execute(Workspace ws) {
@@ -185,41 +179,24 @@ public final class Main {
         }
     }
 
-    private static Command parseInitCommand(String args, Workspace workspace) {
+    private static Command parseInitCommand(String args, Workspace workspace, ApplicationContext context) {
         if (args.isEmpty()) {
             throw new IllegalArgumentException("init 命令需要文件名: init <filename>");
         }
 
         String filename = args.trim();
 
-        // 创建一个简单的初始化命令
+        // 使用 SPI 提供的 EditorProvider 来创建编辑器实例
         return new Command() {
             @Override
             public void execute(Workspace ws) {
-                TextEditor editor = new TextEditor(filename);
-                editor.loadContent(""); // 空文件
+                var factory = context.editorFactory();
+                var editor = factory.createEditor(filename);
+                editor.loadContent("");
                 ws.addEditor(editor);
                 ws.setActiveEditor(editor);
                 System.out.println("已创建文件: " + filename);
                 System.out.println("提示：使用 'append \"text\"' 添加内容");
-            }
-        };
-    }
-
-    private static Command createStatusCommand(Workspace workspace) {
-        return new Command() {
-            @Override
-            public void execute(Workspace ws) {
-                if (ws.getActiveEditor() == null) {
-                    System.out.println("没有打开的文件");
-                } else {
-                    System.out.println("当前文件: " + ws.getActiveEditor().getName());
-                    System.out.println("修改状态: " + (ws.getActiveEditor().isModified() ? "已修改" : "未修改"));
-                    if (ws.getActiveEditor() instanceof TextEditor) {
-                        TextEditor te = (TextEditor) ws.getActiveEditor();
-                        System.out.println("行数: " + te.getLineCount());
-                    }
-                }
             }
         };
     }
@@ -336,6 +313,25 @@ public final class Main {
         System.out.println("  > insert 1:7 \"Beautiful \"");
         System.out.println("  > show");
         System.out.println("========================================");
+    }
+
+    private static com.team20.editor.domain.command.Command createStatusCommand(Workspace workspace) {
+        return new com.team20.editor.domain.command.Command() {
+            @Override
+            public void execute(Workspace ws) {
+                Editor active = ws.getActiveEditor();
+                if (active == null) {
+                    System.out.println("没有打开的文件");
+                    return;
+                }
+                System.out.println("当前文件: " + active.getName());
+                System.out.println("修改状态: " + (active.isModified() ? "已修改" : "未修改"));
+                if (active instanceof TextEditor) {
+                    TextEditor te = (TextEditor) active;
+                    System.out.println("行数: " + te.getLineCount());
+                }
+            }
+        };
     }
 
     private static void banner() {

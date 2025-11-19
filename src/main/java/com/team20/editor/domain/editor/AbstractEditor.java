@@ -1,18 +1,17 @@
 package com.team20.editor.domain.editor;
 
 /**
- * 抽象编辑器基类
+ * 抽象编辑器：提供 Editor 接口的常见实现（name / modified 管理）
+ *
+ * 具体编辑器应继承此类并实现 content() 与 loadContent(...)。
  */
 public abstract class AbstractEditor implements Editor {
-    private final String name;
-    private boolean modified;
 
-    public AbstractEditor(String name) {
-        if (name == null || name.isEmpty()) {
-            throw new IllegalArgumentException("编辑器名称不能为空");
-        }
+    private final String name;
+    private boolean modified = false;
+
+    protected AbstractEditor(String name) {
         this.name = name;
-        this.modified = false;
     }
 
     @Override
@@ -20,10 +19,18 @@ public abstract class AbstractEditor implements Editor {
         return name;
     }
 
+    /**
+     * 返回当前编辑器的全部文本表示。Concrete class 实现 content() 来返回真实内容。
+     */
     @Override
-    public String getFilepath() {
-        return name;
+    public String getContent() {
+        return content();
     }
+
+    /**
+     * 子类应实现该方法，将内部行结构拼接为单个字符串返回（通常用 '\n' 分隔）。
+     */
+    protected abstract String content();
 
     @Override
     public boolean isModified() {
@@ -35,39 +42,11 @@ public abstract class AbstractEditor implements Editor {
         this.modified = modified;
     }
 
-    @Override
-    public String getContent() {
-        return content();
-    }
-
     /**
-     * 子类实现具体的内容获取逻辑
+     * 由具体编辑器实现：把整个文件内容加载到内部数据结构（例如按行拆分到 List<String>）。
+     *
+     * @param content 完整文件文本（可能包含多行）
      */
-    protected abstract String content();
-
     @Override
-    public boolean canUndo() {
-        return false; // 默认不支持，子类可覆盖
-    }
-
-    @Override
-    public boolean canRedo() {
-        return false; // 默认不支持，子类可覆盖
-    }
-
-    @Override
-    public void undo() {
-        throw new UnsupportedOperationException("此编辑器不支持撤销操作");
-    }
-
-    @Override
-    public void redo() {
-        throw new UnsupportedOperationException("此编辑器不支持重做操作");
-    }
-
-    @Override
-    public String toString() {
-        return String.format("%s[name=%s, modified=%s]",
-                getClass().getSimpleName(), name, modified);
-    }
+    public abstract void loadContent(String content);
 }

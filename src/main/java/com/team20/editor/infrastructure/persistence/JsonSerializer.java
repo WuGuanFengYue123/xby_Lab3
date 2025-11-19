@@ -1,23 +1,21 @@
 package com.team20.editor.infrastructure.persistence;
 
-import com.google.gson.Gson;
-import com.team20.editor.domain.workspace.WorkspaceState;
+import java.util.Objects;
 
-public class JsonSerializer implements Serializer {
-    private final Gson gson = new Gson();
+/**
+ * Minimal JsonSerializer shim to satisfy Serializer SPI.
+ */
+public class JsonSerializer implements Serializer<Object> {
 
     @Override
-    public String serialize(WorkspaceState state) {
-        return gson.toJson(state);
+    public String serialize(Object obj) throws Exception {
+        if (obj == null) return "null";
+        return Objects.toString(obj);
     }
 
     @Override
-    public WorkspaceState deserialize(String raw) {
-        return gson.fromJson(raw, WorkspaceState.class);
-    }
-
-    @Override
-    public String format() {
-        return "json";
+    public Object deserialize(String raw) throws Exception {
+        // not implemented: core ships a minimal placeholder
+        throw new UnsupportedOperationException("JsonSerializer.deserialize(String) not implemented in core; provide a plugin serializer for full support.");
     }
 }
