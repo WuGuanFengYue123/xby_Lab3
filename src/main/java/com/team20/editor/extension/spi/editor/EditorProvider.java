@@ -7,17 +7,17 @@ import com.team20.editor.domain.editor.Editor;
  */
 public interface EditorProvider {
     /**
-     * 获取支持的文件扩展名（如 "txt", "xml"）
+     * 支持的扩展名（不带点），例如 "txt"
      */
     String getSupportedExtension();
 
     /**
-     * 创建编辑器实例
+     * 根据文件路径创建 Editor 实例（实现决定名称如何填充）
      */
     Editor createEditor(String filepath);
 
     /**
-     * 编辑器类型名称
+     * 人类可读的编辑器类型名称，例如 "TextEditor"
      */
     String getEditorType();
 }
