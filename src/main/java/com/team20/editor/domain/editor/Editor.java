@@ -1,53 +1,18 @@
 package com.team20.editor.domain.editor;
 
 /**
- * 统一编辑器接口
+ * 编辑器基础接口（统一编辑器契约）
  */
 public interface Editor {
-    /**
-     * 获取编辑器名称/文件路径
-     */
+    /** 标识（通常为文件路径或名称） */
     String getName();
 
-    /**
-     * 获取文件路径（与 getName 相同）
-     */
-    default String getFilepath() {
-        return getName();
-    }
-
-    /**
-     * 获取内容
-     */
+    /** 以文本方式返回全部内容 */
     String getContent();
 
-    /**
-     * 是否可以撤销
-     */
-    boolean canUndo();
-
-    /**
-     * 是否可以重做
-     */
-    boolean canRedo();
-
-    /**
-     * 撤销
-     */
-    void undo();
-
-    /**
-     * 重做
-     */
-    void redo();
-
-    /**
-     * 是否已修改
-     */
+    /** 当前文件是否已修改（未保存） */
     boolean isModified();
 
-    /**
-     * 设置修改状态
-     */
+    /** 标记文件为已修改或已保存 */
     void setModified(boolean modified);
 }
