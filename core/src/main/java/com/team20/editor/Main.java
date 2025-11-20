@@ -3,21 +3,15 @@ package com.team20.editor;
 import com.team20.editor.bootstrap.ApplicationContext;
 import com.team20.editor.domain.command.Command;
 import com.team20.editor.domain.command.UndoableCommand;
-import com.team20.editor.domain.command.impl.text.*;
-import com.team20.editor.domain.command.impl.workspace.*;
-import com.team20.editor.domain.editor.Editor;
-import com.team20.editor.domain.editor.text.TextEditor;
 import com.team20.editor.domain.workspace.Workspace;
+import com.team20.editor.extension.registry.DefaultCommandRegistry;
 
 import java.time.Instant;
 import java.util.Scanner;
 
 /**
- * 程序入口（CLI 主循环）
- *
- * 说明：
- * - parseCommand 现在使用 ApplicationContext.editorFactory() / persistenceManager() 创建命令实例，
- *   从而确保 Editor 实例由 SPI 提供。
+ * Program entry: CLI loop.
+ * Uses DefaultCommandRegistry to create commands by name + raw args.
  */
 public final class Main {
 
@@ -28,6 +22,10 @@ public final class Main {
             ApplicationContext context = new ApplicationContext();
             Workspace workspace = context.createWorkspace();
 
+            // Inject ApplicationContext into registry so plugin factories can access core
+            // services.
+            DefaultCommandRegistry.setApplicationContext(context);
+
             System.out.println(context.dumpSummary());
             System.out.println();
             System.out.println("Team20 Text Editor ready.");
@@ -35,7 +33,6 @@ public final class Main {
             System.out.println("输入 'help' 查看所有命令，'exit' 退出");
             System.out.println();
 
-            // 启动交互循环（传入 context 以便创建带依赖的命令）
             runInteractiveLoop(context, workspace);
         } catch (Exception e) {
             System.err.println("启动失败: " + e.getMessage());
@@ -49,41 +46,45 @@ public final class Main {
         while (true) {
             try {
                 System.out.print("> ");
-
-                if (!scanner.hasNextLine()) {
+                if (!scanner.hasNextLine())
                     break;
-                }
-
                 String input = scanner.nextLine().trim();
-
-                if (input.isEmpty()) {
+                if (input.isEmpty())
                     continue;
-                }
-
                 if ("exit".equalsIgnoreCase(input) || "quit".equalsIgnoreCase(input)) {
                     System.out.println("退出编辑器...");
                     break;
                 }
-
                 if ("help".equalsIgnoreCase(input)) {
                     printHelp();
                     continue;
                 }
 
-                // 解析并执行命令（parseCommand 现在需要 context）
-                Command command = parseCommand(input, workspace, context);
+                // Use registry to create command
+                String[] parts = input.split("\\s+", 2);
+                String commandName = parts[0].toLowerCase();
+                String rawArgs = parts.length > 1 ? parts[1] : "";
+
+                Command command = DefaultCommandRegistry.getInstance().create(commandName, rawArgs);
                 if (command != null) {
-                    // 如果是可撤销命令，走 invoker 记录历史；否则直接执行
                     if (command instanceof UndoableCommand uc) {
                         context.commandInvoker().executeAndRecord(uc, workspace);
                     } else {
                         command.execute(workspace);
                     }
-                } else {
-                    System.out.println("未知命令: " + input);
-                    System.out.println("输入 'help' 查看帮助");
+                    continue;
                 }
 
+                // fallback: keep init special-cased in core
+                if (commandName.equals("init")) {
+                    Command init = parseInitCommand(rawArgs, workspace, context);
+                    if (init != null)
+                        init.execute(workspace);
+                    continue;
+                }
+
+                System.out.println("未知命令: " + input);
+                System.out.println("输入 'help' 查看帮助");
             } catch (Exception e) {
                 System.err.println("错误: " + e.getMessage());
             }
@@ -92,101 +93,11 @@ public final class Main {
         scanner.close();
     }
 
-    private static Command parseCommand(String input, Workspace workspace, ApplicationContext context) {
-        String[] parts = input.split("\\s+", 2);
-        String commandName = parts[0].toLowerCase();
-        String args = parts.length > 1 ? parts[1] : "";
-
-        try {
-            switch (commandName) {
-                case "init":
-                    return parseInitCommand(args, workspace, context);
-                case "append":
-                    return new AppendCommand(extractQuotedText(args));
-                case "insert":
-                    return parseInsertCommand(args);
-                case "delete":
-                    return parseDeleteCommand(args);
-                case "replace":
-                    return parseReplaceCommand(args);
-                case "show":
-                    return parseShowCommand(args);
-                case "status":
-                    return createStatusCommand(workspace);
-                // file & workspace operations (use context.editorFactory() and context.persistenceManager())
-                case "save":
-                    String savePath = args.isBlank() ? null : args.trim();
-                    return new SaveCommand(context.persistenceManager(), savePath);
-                case "load":
-                    if (args.isBlank()) {
-                        throw new IllegalArgumentException("load 需要参数：load <filepath>");
-                    }
-                    return new LoadCommand(context.editorFactory(), context.persistenceManager(), args.trim());
-                case "edit":
-                    if (args.isBlank()) {
-                        throw new IllegalArgumentException("edit 需要参数：edit <filepath>");
-                    }
-                    return new EditCommand(context.editorFactory(), context.persistenceManager(), args.trim());
-                case "close":
-                    String closePath = args.isBlank() ? null : args.trim();
-                    return new CloseCommand(closePath);
-                case "undo":
-                    return new Command() {
-                        @Override
-                        public void execute(Workspace ws) {
-                            try {
-                                context.commandInvoker().undo(ws);
-                                System.out.println("已撤销");
-                            } catch (IllegalStateException e) {
-                                System.out.println("Nothing to undo.");
-                            }
-                        }
-                    };
-                case "redo":
-                    return new Command() {
-                        @Override
-                        public void execute(Workspace ws) {
-                            try {
-                                context.commandInvoker().redo(ws);
-                                System.out.println("已重做");
-                            } catch (IllegalStateException e) {
-                                System.out.println("Nothing to redo.");
-                            }
-                        }
-                    };
-                case "editor-list":
-                case "editors":
-                    return new Command() {
-                        @Override
-                        public void execute(Workspace ws) {
-                            if (!ws.hasEditors()) {
-                                System.out.println("没有打开的编辑器");
-                                return;
-                            }
-                            int i = 0;
-                            for (var e : ws.getEditors()) {
-                                String activeMark = (e == ws.getActiveEditor()) ? " *active*" : "";
-                                System.out.printf("%d: %s%s%n", ++i, e.getName(), activeMark);
-                            }
-                        }
-                    };
-                default:
-                    return null;
-            }
-        } catch (Exception e) {
-            System.err.println("命令解析失败: " + e.getMessage());
-            return null;
-        }
-    }
-
     private static Command parseInitCommand(String args, Workspace workspace, ApplicationContext context) {
-        if (args.isEmpty()) {
+        if (args == null || args.isBlank()) {
             throw new IllegalArgumentException("init 命令需要文件名: init <filename>");
         }
-
         String filename = args.trim();
-
-        // 使用 SPI 提供的 EditorProvider 来创建编辑器实例
         return new Command() {
             @Override
             public void execute(Workspace ws) {
@@ -199,85 +110,6 @@ public final class Main {
                 System.out.println("提示：使用 'append \"text\"' 添加内容");
             }
         };
-    }
-
-    private static Command parseInsertCommand(String args) {
-        String[] parts = args.split("\\s+", 2);
-        if (parts.length < 2) {
-            throw new IllegalArgumentException("insert 命令格式: insert <line:col> \"text\"");
-        }
-
-        String[] position = parts[0].split(":");
-        if (position.length != 2) {
-            throw new IllegalArgumentException("位置格式错误，应为 line:col");
-        }
-
-        int line = Integer.parseInt(position[0]);
-        int col = Integer.parseInt(position[1]);
-        String text = extractQuotedText(parts[1]);
-
-        return new InsertCommand(line, col, text);
-    }
-
-    private static Command parseDeleteCommand(String args) {
-        String[] parts = args.split("\\s+");
-        if (parts.length < 2) {
-            throw new IllegalArgumentException("delete 命令格式: delete <line:col> <length>");
-        }
-
-        String[] position = parts[0].split(":");
-        if (position.length != 2) {
-            throw new IllegalArgumentException("位置格式错误，应为 line:col");
-        }
-
-        int line = Integer.parseInt(position[0]);
-        int col = Integer.parseInt(position[1]);
-        int length = Integer.parseInt(parts[1]);
-
-        return new DeleteCommand(line, col, length);
-    }
-
-    private static Command parseReplaceCommand(String args) {
-        String[] parts = args.split("\\s+", 3);
-        if (parts.length < 3) {
-            throw new IllegalArgumentException("replace 命令格式: replace <line:col> <length> \"text\"");
-        }
-
-        String[] position = parts[0].split(":");
-        if (position.length != 2) {
-            throw new IllegalArgumentException("位置格式错误，应为 line:col");
-        }
-
-        int line = Integer.parseInt(position[0]);
-        int col = Integer.parseInt(position[1]);
-        int length = Integer.parseInt(parts[1]);
-        String text = extractQuotedText(parts[2]);
-
-        return new ReplaceCommand(line, col, length, text);
-    }
-
-    private static Command parseShowCommand(String args) {
-        if (args.isEmpty()) {
-            return new ShowCommand();
-        }
-
-        String[] parts = args.split(":");
-        if (parts.length != 2) {
-            throw new IllegalArgumentException("show 命令格式: show [startLine:endLine]");
-        }
-
-        int startLine = Integer.parseInt(parts[0]);
-        int endLine = Integer.parseInt(parts[1]);
-
-        return new ShowCommand(startLine, endLine);
-    }
-
-    private static String extractQuotedText(String input) {
-        input = input.trim();
-        if (input.startsWith("\"") && input.endsWith("\"")) {
-            return input.substring(1, input.length() - 1);
-        }
-        throw new IllegalArgumentException("文本参数必须用双引号包裹");
     }
 
     private static void printHelp() {
@@ -306,32 +138,6 @@ public final class Main {
         System.out.println("  exit/quit                   - 退出");
         System.out.println("========================================");
         System.out.println();
-        System.out.println("示例:");
-        System.out.println("  > init test.txt");
-        System.out.println("  > append \"Hello World\"");
-        System.out.println("  > show");
-        System.out.println("  > insert 1:7 \"Beautiful \"");
-        System.out.println("  > show");
-        System.out.println("========================================");
-    }
-
-    private static com.team20.editor.domain.command.Command createStatusCommand(Workspace workspace) {
-        return new com.team20.editor.domain.command.Command() {
-            @Override
-            public void execute(Workspace ws) {
-                Editor active = ws.getActiveEditor();
-                if (active == null) {
-                    System.out.println("没有打开的文件");
-                    return;
-                }
-                System.out.println("当前文件: " + active.getName());
-                System.out.println("修改状态: " + (active.isModified() ? "已修改" : "未修改"));
-                if (active instanceof TextEditor) {
-                    TextEditor te = (TextEditor) active;
-                    System.out.println("行数: " + te.getLineCount());
-                }
-            }
-        };
     }
 
     private static void banner() {
