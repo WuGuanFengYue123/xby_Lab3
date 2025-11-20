@@ -1,177 +1,238 @@
 #!/usr/bin/env bash
-# Migrate provider implementations from core to plugins/core-impl (strict pluginization)
-# - Uses git mv when possible to preserve history; falls back to mv if not a git repo.
-# - Merges/creates META-INF/services files in plugins/core-impl (avoids duplicates).
-# - Removes implementation registrations from core's META-INF/services.
-#
-# Usage:
-#   chmod +x migrate_providers_to_plugins.sh
-#   ./migrate_providers_to_plugins.sh
-#
-# IMPORTANT: Commit or stash any uncommitted work before running.
+# verify_plugins.sh
+# Verification script for strict pluginization and runtime provider availability.
+# (fixed plugin discovery logic to be portable and reliable)
+set -uo pipefail
 
-set -euo pipefail
+FAILURES=()
 
-ROOT="$(pwd)"
-GIT_OK=0
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  GIT_OK=1
+# Detect mvn wrapper
+if [ -f "./mvnw" ]; then
+  MAVEN="./mvnw"
+else
+  MAVEN="mvn"
 fi
 
-echo "Running migration at: ${ROOT}"
+info() { printf "\e[1;34m[INFO]\e[0m %s\n" "$*"; }
+ok()   { printf "\e[1;32m[OK]\e[0m %s\n" "$*"; }
+warn() { printf "\e[1;33m[WARN]\e[0m %s\n" "$*"; }
+err()  { printf "\e[1;31m[FAIL]\e[0m %s\n" "$*"; FAILURES+=("$*"); }
+
+echo
+info "Verification started at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo
 
-# List of source:destination mappings (relative to repo root)
-# Add or remove entries as needed. Script will skip non-existent sources.
-MAPS=(
-  "core/src/main/java/com/team20/editor/representation/tree/providers/CoreNodeAdapterProvider.java:plugins/core-impl/src/main/java/com/team20/editor/representation/tree/providers/CoreNodeAdapterProvider.java"
-  "core/src/main/java/com/team20/editor/monitoring/logging/ConsoleLogSink.java:plugins/core-impl/src/main/java/com/team20/editor/monitoring/logging/ConsoleLogSink.java"
-  "core/src/main/java/com/team20/editor/monitoring/logging/FileLogSink.java:plugins/core-impl/src/main/java/com/team20/editor/monitoring/logging/FileLogSink.java"
-  "core/src/main/java/com/team20/editor/infrastructure/persistence/DefaultSerializerProvider.java:plugins/core-impl/src/main/java/com/team20/editor/infrastructure/persistence/DefaultSerializerProvider.java"
-  "core/src/main/java/com/team20/editor/infrastructure/persistence/JsonSerializer.java:plugins/core-impl/src/main/java/com/team20/editor/infrastructure/persistence/JsonSerializer.java"
-  "core/src/main/java/com/team20/editor/domain/command/impl/logging/LoggingCommandProvider.java:plugins/core-impl/src/main/java/com/team20/editor/domain/command/impl/logging/LoggingCommandProvider.java"
-  # add more mappings here if you identify other concrete providers in core
-)
+# 1) Static scan for direct instantiations inside core
+info "1) Static scan for direct instantiations in core..."
 
-# Service files to migrate: each entry is interface-filename (path under META-INF/services)
-SERVICES_TO_HANDLE=(
-  "com.team20.editor.extension.spi.command.CommandProvider"
+BAD_CLASSES=( "TextEditor" "ConsoleLogSink" "JsonSerializer" "DefaultSerializerProvider" "TextEditorProvider" )
+CORE_SRC_DIRS=( "core/src/main/java" "src/main/java" )
+
+FOUND_BAD=0
+for d in "${CORE_SRC_DIRS[@]}"; do
+  if [ -d "$d" ]; then
+    for cname in "${BAD_CLASSES[@]}"; do
+      matches=$(grep -R --line-number -E "new[[:space:]]+${cname}[[:space:]]*\(" "$d" 2>/dev/null || true)
+      if [ -n "$matches" ]; then
+        warn "Direct instantiation(s) of ${cname} found under ${d}:"
+        printf '%s\n' "$matches"
+        FOUND_BAD=1
+      fi
+    done
+  fi
+done
+
+if [ "$FOUND_BAD" -eq 0 ]; then
+  ok "No forbidden direct instantiations found in core source directories."
+else
+  err "Remove or refactor the above direct instantiations to use ServiceLoader/Factory."
+fi
+
+echo
+
+# 2) Check core's META-INF/services (it should NOT list concrete implementations)
+info "2) Checking core/src/main/resources/META-INF/services (should NOT contain provider implementations)..."
+
+CORE_SERVICES_DIR="core/src/main/resources/META-INF/services"
+if [ -d "$CORE_SERVICES_DIR" ]; then
+  any_impl_found=0
+  for f in "$CORE_SERVICES_DIR"/*; do
+    [ -f "$f" ] || continue
+    impls=$(sed -n '/^[[:space:]]*#/d;/^[[:space:]]*$/d;p' "$f" || true)
+    if [ -n "$impls" ]; then
+      warn "Core service file $f contains implementation lines (should be empty or removed):"
+      printf '%s\n' "$impls"
+      any_impl_found=1
+    fi
+  done
+
+  if [ "$any_impl_found" -eq 0 ]; then
+    ok "No implementation entries found in core's META-INF/services."
+  else
+    err "Please remove implementation registrations from core's services so core has no built-in implementations."
+  fi
+else
+  ok "No core META-INF/services directory found (good)."
+fi
+
+echo
+
+# 3) Discover plugins and validate each plugin's META-INF/services and implementation classes
+info "3) Discovering plugins under plugins/ and validating their META-INF/services..."
+
+PLUGINS_ROOT="plugins"
+PLUGIN_MODULES=()
+
+# --- Robust plugin discovery: find pom.xml under plugins/* and convert to module dir ---
+# We avoid using xargs tricks or non-portable dirname options.
+if [ -d "${PLUGINS_ROOT}" ]; then
+  # find depth 2 (plugins/<module>/pom.xml) but allow deeper modules if needed: use -maxdepth 3 as safe option
+  # Adjust maxdepth if your plugin layout is deeper.
+  while IFS= read -r -d '' pomfile; do
+    # get containing directory
+    moddir="$(dirname "$pomfile")"
+    PLUGIN_MODULES+=("$moddir")
+  done < <(find "${PLUGINS_ROOT}" -maxdepth 3 -mindepth 1 -type f -name "pom.xml" -print0 2>/dev/null || true)
+fi
+
+if [ ${#PLUGIN_MODULES[@]} -eq 0 ]; then
+  warn "No plugin modules with pom.xml found under plugins/. That's fine if you intentionally have no plugins, but core will not run in strict mode without plugins."
+else
+  ok "Found ${#PLUGIN_MODULES[@]} plugin module(s):"
+  for p in "${PLUGIN_MODULES[@]}"; do
+    printf "  - %s\n" "$p"
+  done
+fi
+
+REQUIRED_SPIS=(
   "com.team20.editor.extension.spi.editor.EditorProvider"
-  "com.team20.editor.extension.spi.node.NodeAdapterProvider"
   "com.team20.editor.extension.spi.serialization.SerializerProvider"
   "com.team20.editor.monitoring.logging.LogSink"
 )
 
-# Ensure plugin services directory exists
-PLUGIN_SERVICES_DIR="plugins/core-impl/src/main/resources/META-INF/services"
-mkdir -p "${PLUGIN_SERVICES_DIR}"
+declare -A SPI_FOUND
+for s in "${REQUIRED_SPIS[@]}"; do SPI_FOUND["$s"]=0; done
 
-# Helper: ensure parent dir exists
-ensure_parent_dir() {
-  local dest="$1"
-  local parent
-  parent="$(dirname "$dest")"
-  if [ ! -d "$parent" ]; then
-    mkdir -p "$parent"
+for plugin in "${PLUGIN_MODULES[@]}"; do
+  info "Checking plugin: $plugin"
+  svcdir="$plugin/src/main/resources/META-INF/services"
+  if [ ! -d "$svcdir" ]; then
+    warn "  No META-INF/services in $plugin (expected for a plugin implementing SPI)."
+    continue
   fi
-}
 
-# Move files preserving git history if possible
-moved_any=0
-echo "Moving implementation source files..."
-for m in "${MAPS[@]}"; do
-  src="${m%%:*}"
-  dst="${m#*:}"
-  if [ -f "$src" ]; then
-    ensure_parent_dir "$dst"
-    if [ "$GIT_OK" -eq 1 ]; then
-      echo "  git mv $src -> $dst"
-      git mv "$src" "$dst"
-    else
-      echo "  mv $src -> $dst"
-      mv "$src" "$dst"
+  for sf in "$svcdir"/*; do
+    [ -f "$sf" ] || continue
+    fname=$(basename "$sf")
+    echo "  service: $fname"
+    impls=$(sed -n '/^[[:space:]]*#/d;/^[[:space:]]*$/d;p' "$sf" || true)
+    if [ -z "$impls" ]; then
+      warn "    file exists but contains no implementation entries."
+      continue
     fi
-    moved_any=1
-  else
-    echo "  skip (not found): $src"
-  fi
+    while IFS= read -r impl; do
+      [ -z "$impl" ] && continue
+      printf "    -> %s\n" "$impl"
+      implpath="${plugin}/src/main/java/$(echo "$impl" | sed 's/\./\//g').java"
+      implclasspath="${plugin}/target/classes/$(echo "$impl" | sed 's/\./\//g').class"
+      if [ -f "$implpath" ]; then
+        ok "      implementation source found: $implpath"
+      elif [ -f "$implclasspath" ]; then
+        ok "      compiled implementation found: $implclasspath"
+      else
+        if [ -f "core/src/main/java/$(echo "$impl" | sed 's/\./\//g').java" ]; then
+          warn "      implementation source found in core (should be in plugin): core/..."
+        else
+          err "      implementation class not found for $impl (neither source nor compiled class present)."
+        fi
+      fi
+
+      if [ "${SPI_FOUND[$fname]+_}" ]; then
+        SPI_FOUND["$fname"]=1
+      fi
+    done <<EOF
+$impls
+EOF
+  done
 done
 
-if [ "$moved_any" -eq 0 ]; then
-  echo "No implementation source files were moved (none of configured sources existed)."
-else
-  echo "Source file moves done."
-fi
-
 echo
-echo "Merging service registration entries from core -> plugins/core-impl and removing core registrations..."
-
-CORE_SERVICES_DIR="core/src/main/resources/META-INF/services"
-
-for svc in "${SERVICES_TO_HANDLE[@]}"; do
-  core_file="${CORE_SERVICES_DIR}/${svc}"
-  plugin_file="${PLUGIN_SERVICES_DIR}/${svc}"
-
-  # collect existing implementations
-  impls_core=""
-  impls_plugin=""
-  if [ -f "$core_file" ]; then
-    impls_core="$(sed -n '/^[[:space:]]*#/d;/^[[:space:]]*$/d;p' "$core_file" || true)"
-  fi
-  if [ -f "$plugin_file" ]; then
-    impls_plugin="$(sed -n '/^[[:space:]]*#/d;/^[[:space:]]*$/d;p' "$plugin_file" || true)"
-  fi
-
-  # merge unique lines: plugin impls take precedence; add from core if missing
-  merged="$impls_plugin"
-  while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    # skip if already present in plugin file
-    if ! grep -Fxq "$line" <<<"$impls_plugin"; then
-      merged="${merged}"$'\n'"${line}"
-    fi
-  done <<EOF
-$impls_core
-EOF
-
-  # write merged back to plugin service file if non-empty
-  if [ -n "$(echo "$merged" | sed '/^[[:space:]]*$/d')" ]; then
-    ensure_parent_dir "$plugin_file"
-    printf "%s\n" "$merged" | awk '!x[$0]++' >"${plugin_file}.tmp"
-    mv "${plugin_file}.tmp" "$plugin_file"
-    if [ "$GIT_OK" -eq 1 ]; then
-      git add "$plugin_file"
-    fi
-    echo "  merged -> ${plugin_file}"
-  fi
-
-  # remove core service file if exists
-  if [ -f "$core_file" ]; then
-    if [ "$GIT_OK" -eq 1 ]; then
-      git rm -f "$core_file" || true
-      # if parent META-INF/services dir now empty in core, remove it
-      rmdir --ignore-fail-on-non-empty "$(dirname "$core_file")" 2>/dev/null || true
-    else
-      rm -f "$core_file" || true
-    fi
-    echo "  removed core service: ${core_file}"
+info "Aggregated required SPI presence across plugins:"
+for s in "${REQUIRED_SPIS[@]}"; do
+  if [ "${SPI_FOUND[$s]}" -eq 1 ]; then
+    ok "  $s - found in plugins"
+  else
+    warn "  $s - NOT found in any plugin (core strict mode requires providers for required SPIs)"
   fi
 done
 
 echo
-echo "Sanity checks: ensure plugins/core-impl/pom.xml depends on core (SPI) so it can compile."
-if [ -f "plugins/core-impl/pom.xml" ]; then
-  if ! grep -q "<artifactId>text-editor</artifactId>" plugins/core-impl/pom.xml; then
-    echo "  Warning: plugins/core-impl/pom.xml does not declare a dependency on core/text-editor. You should add:"
-    cat <<EOF
-    <dependency>
-      <groupId>com.team20</groupId>
-      <artifactId>text-editor</artifactId>
-      <version>\${project.version}</version>
-    </dependency>
-EOF
+
+# 4) Build project (package)
+info "4) Building project (package) - this will compile core and discovered plugins..."
+modules_csv="core"
+for p in "${PLUGIN_MODULES[@]}"; do
+  modules_csv+=",${p}"
+done
+
+info "Running: ${MAVEN} -am -pl \"${modules_csv}\" -DskipTests clean package"
+if ! ${MAVEN} -am -pl "${modules_csv}" -DskipTests clean package; then
+  err "Maven build failed. Inspect output above for compilation errors."
+else
+  ok "Maven build succeeded for core and plugins (package)."
+fi
+
+echo
+
+# 5) Runtime check: run ./build.sh run for a short timeout and inspect output for provider discovery
+info "5) Runtime check: launching './build.sh run' for a short, headless verification..."
+
+if [ ! -x "./build.sh" ]; then
+  warn "build.sh not found or not executable; skipping runtime check."
+else
+  LOGFILE=$(mktemp /tmp/verify_plugins.XXXXXX.log)
+  TIMEOUT_SECS=8
+  info "Running './build.sh run' for ${TIMEOUT_SECS}s and capturing output to ${LOGFILE}..."
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "${TIMEOUT_SECS}" ./build.sh run >"${LOGFILE}" 2>&1 || true
   else
-    echo "  plugins/core-impl/pom.xml declares dependency on core/text-editor (ok)."
+    ./build.sh run >"${LOGFILE}" 2>&1 & pid=$!
+    sleep "${TIMEOUT_SECS}"
+    kill "${pid}" 2>/dev/null || true
   fi
-else
-  echo "  Warning: plugins/core-impl/pom.xml not found. Ensure plugin module exists and declares core as dependency."
+
+  echo "---- runtime output (last 200 lines) ----"
+  tail -n 200 "${LOGFILE}" || true
+  echo "---- end runtime output ----"
+
+  if grep -E "ServiceConfigurationError|Provider .* not found|NoSuchMethodError|ClassNotFoundException" "${LOGFILE}" >/dev/null 2>&1; then
+    err "Runtime output contains ServiceLoader/Classpath errors. See above for details."
+  else
+    if grep -E "Editor providers:|Application Context Summary|Team20 Text Editor" "${LOGFILE}" >/dev/null 2>&1; then
+      ok "Runtime output shows application started and providers were likely discovered."
+    else
+      warn "Runtime output did not clearly show provider discovery. Manual inspection may be required."
+    fi
+  fi
+  rm -f "${LOGFILE}"
 fi
 
 echo
-if [ "$GIT_OK" -eq 1 ]; then
-  echo "Committing changes to git..."
-  git add -A
-  git commit -m "Migrate provider implementations from core to plugins/core-impl and register services in plugin"
-  echo "Git commit created."
-else
-  echo "Not a git repo: changes made locally but not committed."
-fi
 
-echo
-echo "Done. Next recommended steps:"
-echo "  1) Review changes (git status / git diff) and run tests/build:"
-echo "       ./build.sh package"
-echo "  2) Run the strict run to ensure ServiceLoader finds plugin providers:"
-echo "       ./build.sh run"
-echo "  3) If everything OK, push changes: git push"
-echo
+if [ "${#FAILURES[@]}" -ne 0 ]; then
+  err "Verification finished: FAILURES detected (${#FAILURES[@]}):"
+  for f in "${FAILURES[@]}"; do
+    printf "  - %s\n" "$f"
+  done
+  echo
+  echo "Suggested fixes (summary):"
+  echo "  * Remove direct instantiations in core; use ServiceLoader/Provider pattern."
+  echo "  * Ensure core does not register concrete providers in core/src/main/resources/META-INF/services."
+  echo "  * Ensure each plugin has proper META-INF/services/<SPI-FQN> files listing implementations."
+  echo "  * Make sure plugin implementation classes exist under plugin/src/main/java and compile."
+  echo "  * Re-run ./build.sh run after fixing issues; the script assembles runtime classpath for strict mode."
+  exit 2
+else
+  ok "Verification finished: all checks passed (or only warnings)."
+  exit 0
+fi
