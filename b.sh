@@ -1,36 +1,64 @@
 #!/usr/bin/env bash
-# Migrate provider implementations from core -> plugins/core-impl (strict pluginization)
-# - Uses git mv when possible (preserve history)
-# - Merges core META-INF/services into plugin services and removes core registrations
-# - Skips missing files safely (idempotent)
-# - Commits changes if running in a git repo
+#
+# Migrate concrete implementation sources from core -> plugins/core-impl
+# - Safe, idempotent, supports --dry-run
+# - Uses git mv when in a git repo (preserve history); otherwise mv
+# - Merges META-INF/services entries into plugins/core-impl services
+#
+# Usage:
+#   chmod +x scripts/migrate_all_impls_to_plugins.sh
+#   # preview only
+#   ./scripts/migrate_all_impls_to_plugins.sh --dry-run
+#   # execute
+#   ./scripts/migrate_all_impls_to_plugins.sh
+#
 set -euo pipefail
 
 ROOT="$(pwd)"
+DRY_RUN=0
+if [ "${1:-}" = "--dry-run" ]; then
+  DRY_RUN=1
+fi
+
+# detect git repo
 GIT_OK=0
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   GIT_OK=1
 fi
 
-echo "Starting migration (root=${ROOT})"
-echo "Note: commit or stash uncommitted work before running."
+echo "Migration root: ${ROOT}"
+[ "$DRY_RUN" -eq 1 ] && echo "(dry-run mode: no files will be changed)"
 
-# Configure mappings: src:dst (relative to repo root).
-# Add entries as needed. Missing src entries will be skipped.
-MAPS=(
-  "core/src/main/java/com/team20/editor/representation/tree/providers/CoreNodeAdapterProvider.java:plugins/core-impl/src/main/java/com/team20/editor/representation/tree/providers/CoreNodeAdapterProvider.java"
-  "core/src/main/java/com/team20/editor/monitoring/logging/ConsoleLogSink.java:plugins/core-impl/src/main/java/com/team20/editor/monitoring/logging/ConsoleLogSink.java"
-  "core/src/main/java/com/team20/editor/monitoring/logging/FileLogSink.java:plugins/core-impl/src/main/java/com/team20/editor/monitoring/logging/FileLogSink.java"
-  "core/src/main/java/com/team20/editor/infrastructure/persistence/DefaultSerializerProvider.java:plugins/core-impl/src/main/java/com/team20/editor/infrastructure/persistence/DefaultSerializerProvider.java"
-  "core/src/main/java/com/team20/editor/infrastructure/persistence/JsonSerializer.java:plugins/core-impl/src/main/java/com/team20/editor/infrastructure/persistence/JsonSerializer.java"
-  "core/src/main/java/com/team20/editor/domain/command/impl/logging/LoggingCommandProvider.java:plugins/core-impl/src/main/java/com/team20/editor/domain/command/impl/logging/LoggingCommandProvider.java"
-  "core/src/main/java/com/team20/editor/domain/command/impl/workspace/CloseCommand.java:plugins/core-impl/src/main/java/com/team20/editor/domain/command/impl/workspace/CloseCommand.java"
-  "core/src/main/java/com/team20/editor/domain/command/impl/workspace/EditCommand.java:plugins/core-impl/src/main/java/com/team20/editor/domain/command/impl/workspace/EditCommand.java"
-  "core/src/main/java/com/team20/editor/extension/spi/editor/TextEditorProvider.java:plugins/core-impl/src/main/java/com/team20/editor/extension/spi/editor/TextEditorProvider.java"
+# destination base
+PLUGIN_BASE="plugins/core-impl"
+DEST_BASE="${PLUGIN_BASE}/src/main/java"
+
+# candidate globs (we will find files under these patterns)
+CANDIDATE_PATHS=(
+  "core/src/main/java/**/domain/command/impl"
+  "core/src/main/java/**/monitoring/logging"
+  "core/src/main/java/**/infrastructure/persistence"
+  "core/src/main/java/**/representation/tree/providers"
+  "core/src/main/java/**/domain/command/impl/*"
 )
 
-# Services to merge (filenames under META-INF/services)
-SERVICES=(
+# (excerpt — replace EXCLUDE_NAMES in your script)
+EXCLUDE_NAMES=(
+  "LogSink.java"
+  "Logger.java"
+  "LogListener.java"
+  "Serializer.java"
+  "Command.java"
+  "CommandDescriptor.java"
+  "CommandInvoker.java"
+  "UndoableCommand.java"
+  "PersistenceManager.java"   # <-- DO NOT MOVE: keep persistence manager in core
+)
+
+# service files to merge
+CORE_SERVICES_DIR="core/src/main/resources/META-INF/services"
+PLUGIN_SERVICES_DIR="${PLUGIN_BASE}/src/main/resources/META-INF/services"
+SERVICES_TO_HANDLE=(
   "com.team20.editor.extension.spi.command.CommandProvider"
   "com.team20.editor.extension.spi.editor.EditorProvider"
   "com.team20.editor.extension.spi.node.NodeAdapterProvider"
@@ -38,11 +66,7 @@ SERVICES=(
   "com.team20.editor.monitoring.logging.LogSink"
 )
 
-PLUGIN_SERVICES_DIR="plugins/core-impl/src/main/resources/META-INF/services"
-CORE_SERVICES_DIR="core/src/main/resources/META-INF/services"
-
-mkdir -p "${PLUGIN_SERVICES_DIR}"
-
+# helper
 ensure_parent_dir() {
   local f="$1"
   local p
@@ -52,32 +76,70 @@ ensure_parent_dir() {
   fi
 }
 
-moved=0
-echo "Moving source files..."
-for m in "${MAPS[@]}"; do
-  src="${m%%:*}"
-  dst="${m#*:}"
-  if [ -f "$src" ]; then
-    ensure_parent_dir "$dst"
-    if [ "$GIT_OK" -eq 1 ]; then
-      git mv -f "$src" "$dst"
-    else
-      mv -f "$src" "$dst"
+is_excluded_name() {
+  local name="$1"
+  for ex in "${EXCLUDE_NAMES[@]}"; do
+    if [ "$ex" = "$name" ]; then
+      return 0
     fi
-    echo "  moved: $src -> $dst"
-    moved=1
-  else
-    echo "  skip (not found): $src"
+  done
+  return 1
+}
+
+# gather candidate files
+echo "Collecting candidate implementation files..."
+FILES_TO_MOVE=()
+# use find to locate likely implementation files under impl / providers / logging / persistence
+while IFS= read -r -d '' f; do
+  fname="$(basename "$f")"
+  if is_excluded_name "$fname"; then
+    continue
   fi
+  # skip interfaces or abstract classes heuristically: check for 'interface' or 'abstract class' line
+  if grep -E '^\s*(public\s+)?interface\s+' "$f" >/dev/null 2>&1; then
+    continue
+  fi
+  if grep -E '^\s*(public\s+)?abstract\s+class\s+' "$f" >/dev/null 2>&1; then
+    continue
+  fi
+  FILES_TO_MOVE+=("$f")
+done < <(find core/src/main/java -type f -name '*.java' \( -path '*/domain/command/impl/*' -o -path '*/monitoring/logging/*' -o -path '*/infrastructure/persistence/*' -o -path '*/representation/tree/providers/*' \) -print0)
+
+# print summary
+echo "Found ${#FILES_TO_MOVE[@]} candidate files to move."
+for f in "${FILES_TO_MOVE[@]}"; do
+  echo "  - $f"
 done
 
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "Dry-run complete. No changes made."
+  exit 0
+fi
+
+# perform moves
 echo
-echo "Merging service registration files..."
-for svc in "${SERVICES[@]}"; do
+echo "Moving files to ${DEST_BASE} ..."
+moved_any=0
+for src in "${FILES_TO_MOVE[@]}"; do
+  rel="${src#core/}"   # path relative to core/
+  dst="${DEST_BASE}/${rel#src/main/java/}"  # strip src/main/java/ from rel
+  ensure_parent_dir "$dst"
+  if [ "$GIT_OK" -eq 1 ]; then
+    git mv -f "$src" "$dst"
+  else
+    mv -f "$src" "$dst"
+  fi
+  echo "  moved: $src -> $dst"
+  moved_any=1
+done
+
+# Merge service files (same behavior as earlier script)
+echo
+echo "Merging service registration files into ${PLUGIN_SERVICES_DIR} ..."
+mkdir -p "${PLUGIN_SERVICES_DIR}"
+for svc in "${SERVICES_TO_HANDLE[@]}"; do
   coref="${CORE_SERVICES_DIR}/${svc}"
   pluginf="${PLUGIN_SERVICES_DIR}/${svc}"
-
-  # gather lines ignoring comments/blank
   core_lines=""
   plugin_lines=""
   if [ -f "$coref" ]; then
@@ -88,7 +150,6 @@ for svc in "${SERVICES[@]}"; do
   fi
 
   merged="${plugin_lines}"
-  # append unique lines from core
   while IFS= read -r ln; do
     [ -z "$ln" ] && continue
     if ! grep -Fxq "$ln" <<<"${plugin_lines}"; then
@@ -104,33 +165,25 @@ EOF
 
   if [ -n "$(echo "$merged" | sed '/^[[:space:]]*$/d')" ]; then
     ensure_parent_dir "$pluginf"
-    # dedupe while writing
     printf "%s\n" "$merged" | awk '!x[$0]++' > "${pluginf}.tmp"
     mv "${pluginf}.tmp" "$pluginf"
     if [ "$GIT_OK" -eq 1 ]; then git add "$pluginf"; fi
-    echo "  merged service -> ${pluginf}"
+    echo "  merged -> ${pluginf}"
   fi
 
-  # remove core service file (if exists)
   if [ -f "$coref" ]; then
-    if [ "$GIT_OK" -eq 1 ]; then
-      git rm -f "$coref" || true
-    else
-      rm -f "$coref" || true
-    fi
+    if [ "$GIT_OK" -eq 1 ]; then git rm -f "$coref" || true; else rm -f "$coref" || true; fi
     echo "  removed core service: ${coref}"
   fi
 done
 
-echo
-# Check plugin pom dependency on core
+# Ensure plugin pom depends on core
 if [ -f "plugins/core-impl/pom.xml" ]; then
-  if ! grep -q "<artifactId>text-editor</artifactId>" plugins/core-impl/pom.xml && ! grep -q "<artifactId>text-editor</artifactId>" plugins/core-impl/pom.xml ; then
+  if ! grep -q "<artifactId>text-editor</artifactId>" plugins/core-impl/pom.xml; then
     cat <<EOF
 
-WARNING: plugins/core-impl/pom.xml does not appear to declare a dependency on core/text-editor.
-Add the following snippet inside <dependencies> of plugins/core-impl/pom.xml:
-
+WARNING: plugins/core-impl/pom.xml does not declare dependency on core/text-editor.
+Add inside <dependencies>:
     <dependency>
       <groupId>com.team20</groupId>
       <artifactId>text-editor</artifactId>
@@ -145,21 +198,23 @@ else
   echo "WARNING: plugins/core-impl/pom.xml not found."
 fi
 
-# Finalize commit if git available
+# finalize git commit
 if [ "$GIT_OK" -eq 1 ]; then
-  if [ "$moved" -eq 1 ]; then
+  if [ "$moved_any" -eq 1 ]; then
     git add -A
-    git commit -m "Migrate provider implementations to plugins/core-impl (strict pluginization)"
-    echo "Committed migration to git."
+    git commit -m "Migrate concrete implementations from core to plugins/core-impl (pluginize impls)"
+    echo "Committed migration."
   else
-    echo "No source files moved; nothing to commit."
+    echo "No implementation files moved; nothing to commit."
   fi
 else
-  echo "Not a git repo: migration actions performed locally (no commit)."
+  echo "Not a git repo: files moved on disk but no commit performed."
 fi
 
 echo
-echo "Migration finished. Suggested next steps:"
-echo "  1) Review changes: git status, git diff"
-echo "  2) Build & test: ./build.sh package && ./build.sh run"
-echo "  3) Run verify: ./verify_plugins.sh"
+echo "Migration finished."
+echo "Next steps:"
+echo "  1) Add a CommandProvider implementation in plugins/core-impl to register commands (close/edit/append/...)."
+echo "  2) Ensure services file plugins/core-impl/src/main/resources/META-INF/services/com.team20.editor.extension.spi.command.CommandProvider contains your provider FQN."
+echo "  3) Build & test: ./build.sh package && ./build.sh run"
+echo "  4) Run verifier: ./verify_plugins.sh"
