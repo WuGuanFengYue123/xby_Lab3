@@ -77,6 +77,28 @@ public final class ApplicationContext {
                     "没有找到任何 EditorProvider 实现。请确保在类路径中包含至少一个实现并在对应模块的 META-INF/services/com.team20.editor.extension.spi.editor.EditorProvider 中声明实现类。");
         }
         this.editorFactory = new EditorFactory(this.editorProviders);
+        // Register help command so "help" is available through the command registry.
+        // Use an inline Command implementation to avoid depending on external impl
+        // packages
+        try {
+            this.commandRegistry.registerFactory("help", rawArgs -> new com.team20.editor.domain.command.Command() {
+                @Override
+                public void execute(Workspace workspace) {
+                    try {
+                        System.out.println(ApplicationContext.this.showHelp());
+                    } catch (Throwable t) {
+                        System.err.println("Failed to display help: " + t.getMessage());
+                    }
+                }
+
+                @Override
+                public String toString() {
+                    return "help";
+                }
+            });
+        } catch (Throwable t) {
+            System.err.println("Warning: failed to register help command factory: " + t.getMessage());
+        }
     }
 
     private Serializer loadSerializer() {
@@ -108,7 +130,8 @@ public final class ApplicationContext {
 
     /**
      * 创建并返回一个新的 Workspace，同时把事件发布器注入到 Workspace 中。
-     * Optionally loads workspace state from .workspace.state and migrates legacy .*.log.enabled markers.
+     * Optionally loads workspace state from .workspace.state and migrates legacy
+     * .*.log.enabled markers.
      */
     public Workspace createWorkspace() {
         Workspace ws = new Workspace();
@@ -182,10 +205,10 @@ public final class ApplicationContext {
                 String fileName = marker.getFileName().toString();
                 // Extract the original filename: .filename.log.enabled -> filename
                 String originalFile = fileName.substring(1, fileName.length() - ".log.enabled".length());
-                
+
                 // Enable logging for this file in workspace
                 ws.setLoggingEnabled(originalFile, true);
-                
+
                 // Delete the legacy marker
                 try {
                     Files.deleteIfExists(marker);
