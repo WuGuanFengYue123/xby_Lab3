@@ -42,8 +42,8 @@
       }
     }
   },
-  "postCreateCommand": "sh -lc 'if [ -f /workspace/mvnw ]; then chmod +x /workspace/mvnw && /workspace/mvnw -B -DskipTests=true clean compile; elif [ -f /workspace/lab1/mvnw ]; then cd /workspace/lab1 && chmod +x mvnw && ./mvnw -B -DskipTests=true clean compile; elif [ -f /workspace/pom.xml ]; then mvn -B -DskipTests=true clean compile; elif [ -f /workspace/lab1/pom.xml ]; then cd /workspace/lab1 && mvn -B -DskipTests=true clean compile; else echo \"No pom.xml found - skipping auto build\"; fi'",
-  "postStartCommand": "sh -lc 'if [ ! -d /home/vscode/.m2/repository ]; then sudo mkdir -p /home/vscode/.m2/repository 2>/dev/null || true; sudo chown -R $(id -u vscode):$(id -g vscode) /home/vscode/.m2 2>/dev/null || chmod -R 0777 /home/vscode/.m2 2>/dev/null; fi'",
+  "postCreateCommand": "sh -lc 'sudo chown -R vscode:vscode /home/vscode/.m2 || true; if [ -f /workspace/mvnw ]; then chmod +x /workspace/mvnw && /workspace/mvnw -B -DskipTests=true clean compile; elif [ -f /workspace/lab1/mvnw ]; then cd /workspace/lab1 && chmod +x mvnw && ./mvnw -B -DskipTests=true clean compile; elif [ -f /workspace/pom.xml ]; then mvn -B -DskipTests=true clean compile; elif [ -f /workspace/lab1/pom.xml ]; then cd /workspace/lab1 && mvn -B -DskipTests=true clean compile; else echo \"No pom.xml found - skipping auto build\"; fi'",
+  "postStartCommand": "sh -lc 'sudo mkdir -p /home/vscode/.m2/repository 2>/dev/null || true; sudo chown -R $(id -u vscode):$(id -g vscode) /home/vscode/.m2 2>/dev/null || true'",
   "forwardPorts": [
     8080
   ],
