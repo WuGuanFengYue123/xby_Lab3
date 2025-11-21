@@ -1,0 +1,3 @@
+com.team20.editor.plugin.workspace.WorkspaceCommandProvider
+com.team20.editor.plugin.text.TextCommandProvider
+com.team20.editor.plugin.logging.LoggingCommandProvider
