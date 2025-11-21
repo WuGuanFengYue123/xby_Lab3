@@ -24,46 +24,85 @@ public final class Main {
     public static void main(String[] args) {
         banner();
 
-        try {
-            ApplicationContext context = new ApplicationContext();
-            Workspace workspace = context.createWorkspace();
+        ApplicationContext context = null;
+        Workspace workspace = null;
 
-            // Inject ApplicationContext into registry so plugin factories can access core
-            // services.
+        try {
+            // Initialize ApplicationContext early
+            context = new ApplicationContext();
+            
+            // Inject ApplicationContext into registry so plugin factories can access core services
             DefaultCommandRegistry.setApplicationContext(context);
 
+            // Create workspace (this loads state and migrates legacy markers)
+            workspace = context.createWorkspace();
+
+            // Display startup information
             System.out.println(context.dumpSummary());
             System.out.println();
             System.out.println("Team20 Text Editor ready.");
-            System.out.println("使用 'init test.txt' 创建文件开始编辑");
-            System.out.println("输入 'help' 查看所有命令，'exit' 退出");
+            System.out.println();
+            System.out.println("Type 'help' to see available commands");
+            System.out.println("Type 'exit' to quit the program");
+            System.out.println();
+            System.out.println("Quick Start:");
+            System.out.println("  init test.txt [with-log]  - Create a new file");
+            System.out.println("  load <filepath>           - Load an existing file");
             System.out.println();
 
-            // Try to let an optional CLI plugin take over (provides up/down history).
-            // If plugin class not present, fall back to built-in interactive loop.
-            try {
-                Class<?> pluginClazz = Class.forName("com.team20.editor.plugin.cli.JLineInteractive");
-                try {
-                    // static method: run(ApplicationContext, Workspace)
-                    java.lang.reflect.Method m = pluginClazz.getMethod("run",
-                            ApplicationContext.class, Workspace.class);
-                    m.invoke(null, context, workspace);
-                    // plugin handled the interactive loop; exit main
-                    return;
-                } catch (NoSuchMethodException | IllegalAccessException
-                        | java.lang.reflect.InvocationTargetException ex) {
-                    System.err.println("可选 CLI 插件存在但无法调用入口 run(ApplicationContext,Workspace): " + ex.getMessage());
-                    // fall back to built-in loop
-                }
-            } catch (ClassNotFoundException ignored) {
-                // plugin not present -> continue with built-in loop
-            }
-
-            runInteractiveLoop(context, workspace);
         } catch (Exception e) {
-            System.err.println("启动失败: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("========================================");
+            System.err.println("Initialization Error: " + e.getMessage());
+            System.err.println("========================================");
+            System.err.println();
+            System.err.println("The application will start in degraded mode.");
+            System.err.println("Some features may not be available.");
+            System.err.println();
+            
+            // If context wasn't created, we can't continue
+            if (context == null) {
+                System.err.println("FATAL: Could not initialize ApplicationContext.");
+                System.err.println("Please check that all required plugins are installed.");
+                return;
+            }
+            
+            // If workspace wasn't created, try again with minimal setup
+            if (workspace == null) {
+                try {
+                    workspace = new Workspace();
+                    System.err.println("Warning: Using workspace without persistence support.");
+                } catch (Exception ex) {
+                    System.err.println("FATAL: Could not create Workspace: " + ex.getMessage());
+                    return;
+                }
+            }
         }
+
+        final ApplicationContext finalContext = context;
+        final Workspace finalWorkspace = workspace;
+
+        // Try to let an optional CLI plugin take over (provides up/down history).
+        // If plugin class not present, fall back to built-in interactive loop.
+        try {
+            Class<?> pluginClazz = Class.forName("com.team20.editor.plugin.cli.JLineInteractive");
+            try {
+                // static method: run(ApplicationContext, Workspace)
+                java.lang.reflect.Method m = pluginClazz.getMethod("run",
+                        ApplicationContext.class, Workspace.class);
+                m.invoke(null, finalContext, finalWorkspace);
+                // plugin handled the interactive loop; exit main
+                return;
+            } catch (NoSuchMethodException | IllegalAccessException
+                    | java.lang.reflect.InvocationTargetException ex) {
+                System.err.println("Optional CLI plugin exists but cannot invoke entry point run(ApplicationContext,Workspace): " + ex.getMessage());
+                System.err.println("Falling back to built-in command loop. To use the enhanced CLI, check plugin compatibility.");
+                // fall back to built-in loop
+            }
+        } catch (ClassNotFoundException ignored) {
+            // plugin not present -> continue with built-in loop
+        }
+
+        runInteractiveLoop(finalContext, finalWorkspace);
     }
 
     private static void runInteractiveLoop(ApplicationContext context, Workspace workspace) {
@@ -94,21 +133,21 @@ public final class Main {
                             break;
                         } else {
                             // NO FALLBACK: require plugin-provided exit
-                            System.out.println("错误：未找到可用的 'exit' 命令实现。");
-                            System.out.println("请确保已部署负责优雅退出的插件（例如 plugins/core-impl 中的 ExitCommand），然后重试。");
+                            System.out.println("Error: 'exit' command not found.");
+                            System.out.println("Please ensure a plugin providing the exit command is deployed (e.g., ExitCommand in plugins/core-impl).");
                             // Do NOT break or exit; continue loop and wait for user to install/enable
                             // plugin or run an explicit command.
                             continue;
                         }
                     } catch (Throwable t) {
-                        System.err.println("尝试执行 'exit' 命令时发生错误: " + t.getMessage());
+                        System.err.println("Error executing 'exit' command: " + t.getMessage());
                         // Do NOT fallback to immediate exit; allow user to inspect error and continue.
                         continue;
                     }
                 }
 
                 if ("help".equalsIgnoreCase(input)) {
-                    printHelp();
+                    System.out.print(context.showHelp());
                     continue;
                 }
 
@@ -127,50 +166,32 @@ public final class Main {
                     continue;
                 }
 
-                System.out.println("未知命令: " + input);
-                System.out.println("输入 'help' 查看帮助");
-            } catch (Exception e) {
-                System.err.println("错误: " + e.getMessage());
+                System.out.println("Unknown command: " + input);
+                System.out.println("Type 'help' to see available commands");
+                } catch (Exception e) {
+                System.err.println("Error: " + e.getMessage());
             }
         }
 
-        scanner.close();
-    }
+        // Save workspace state before exiting
+        try {
+            if (context != null && workspace != null) {
+                context.saveWorkspaceState(workspace);
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Failed to save workspace state: " + e.getMessage());
+        }
 
-    private static void printHelp() {
-        System.out.println("========================================");
-        System.out.println("可用命令:");
-        System.out.println("----------------------------------------");
-        System.out.println("文件操作:");
-        System.out.println("  init <filename> [with-log]  - 创建文件（可选 with-log 在首行写入 '# log' 并启用日志）");
-        System.out.println("  edit <filepath>             - 打开/切换文件");
-        System.out.println("  load <filepath>             - 从磁盘加载文件");
-        System.out.println("  save [filepath]             - 保存当前文件 (可选路径)");
-        System.out.println("  close [filepath]            - 关闭当前或指定文件");
-        System.out.println("  editor-list                 - 列出打开的编辑器");
-        System.out.println();
-        System.out.println("文本编辑:");
-        System.out.println("  append \"text\"              - 追加文本（作为新行，Undoable）");
-        System.out.println("  insert line:col \"text\"     - 插入文本（Undoable）");
-        System.out.println("  replace line:col len \"text\" - 替换文本（Undoable）");
-        System.out.println("  delete line:col length      - 删除字符（Undoable）");
-        System.out.println();
-        System.out.println("编辑控制:");
-        System.out.println("  undo / redo                 - 撤销 / 重做");
-        System.out.println("  status                      - 显示当前状态");
-        System.out.println("  help                        - 显示帮助");
-        System.out.println("  exit/quit                   - 退出（必须由插件提供 'exit' 命令）");
-        System.out.println("========================================");
-        System.out.println();
+        scanner.close();
     }
 
     private static void banner() {
         System.out.println("========================================");
         System.out.println("  Team20 Text Editor v1.0.0");
         System.out.println("========================================");
-        System.out.println("启动时间: " + Instant.now());
-        System.out.println("Java 版本: " + System.getProperty("java.version"));
-        System.out.println("操作系统: " + System.getProperty("os.name"));
+        System.out.println("Startup time: " + Instant.now());
+        System.out.println("Java version: " + System.getProperty("java.version"));
+        System.out.println("OS: " + System.getProperty("os.name"));
         System.out.println("----------------------------------------");
     }
 }
