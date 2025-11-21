@@ -22,8 +22,7 @@ import java.time.format.DateTimeFormatter;
  * - if with-log:
  * - write editor file first line as exactly "# log" (no extra blank line)
  * - append a "session start at yyyyMMdd HH:mm:ss" line into .<filename>.log
- * - DO NOT create .<filename>.log.enabled marker (LogListener will detect "#
- * log")
+ * - enable workspace logging for this file (no marker files)
  */
 public class InitCommand implements Command {
 
@@ -91,7 +90,8 @@ public class InitCommand implements Command {
                 System.err.println("Warning: 无法创建/清空日志文件: " + le.getMessage());
             }
 
-            // If withLog, append session start line (but DO NOT create .log.enabled marker)
+            // If withLog, append session start line, enable workspace logging and persist
+            // workspace state
             if (withLog) {
                 try (PrintWriter pw = new PrintWriter(new FileWriter(logFile, true))) {
                     String session = LocalDateTime.now().format(FORMATTER);
@@ -99,6 +99,22 @@ public class InitCommand implements Command {
                 } catch (Exception le) {
                     System.err.println("Warning: 无法写入 session start 到日志文件: " + le.getMessage());
                 }
+
+                // Enable logging in centralized Workspace state (no marker files)
+                try {
+                    workspace.setLoggingEnabled(filepath, true);
+                } catch (Throwable ignored) {
+                }
+
+                // Persist workspace state (best-effort)
+                try {
+                    if (ctx != null && ctx.persistenceManager() != null) {
+                        ctx.persistenceManager().saveWorkspaceState(".workspace.state", workspace.getState());
+                    }
+                } catch (Throwable le) {
+                    System.err.println("Warning: 无法持久化工作区状态: " + le.getMessage());
+                }
+
                 System.out.println("日志已启用: " + logFile.getName());
             }
         } catch (Throwable t) {
