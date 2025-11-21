@@ -1,12 +1,23 @@
 package com.team20.editor.domain.workspace;
 
+import java.util.List;
+import java.util.Map;
+
 /**
- * 简单的持久化状态对象（演示用）。
- * 实际项目中可包含编辑器列表、buffer、光标、undo 栈等。
+ * WorkspaceState - lightweight DTO for persisting workspace metadata.
+ * Does NOT attempt to instantiate concrete Editor implementations.
  */
 public class WorkspaceState {
     private int editorCount;
     private String activeEditorName;
+    private List<String> editorNames;
+
+    // Persist per-editor flags (e.g. logging enabled). key = editor name/path,
+    // value = true/false
+    private Map<String, Boolean> loggingEnabledMap;
+
+    public WorkspaceState() {
+    }
 
     public int getEditorCount() {
         return editorCount;
@@ -24,19 +35,29 @@ public class WorkspaceState {
         this.activeEditorName = activeEditorName;
     }
 
-    // 将状态恢复为 Workspace 实例（简化）
-    public Workspace toWorkspace() {
-        Workspace ws = new Workspace();
-        // 这里只恢复最小信息：创建指定数量的占位编辑器（名字用 activeEditorName / untitled）
-        for (int i = 0; i < editorCount; i++) {
-            // 使用 domain editor 实现创建占位文本编辑器
-            com.team20.editor.domain.editor.text.TextEditor te = new com.team20.editor.domain.editor.text.TextEditor(
-                    "untitled-" + i);
-            ws.addEditor(te);
-        }
-        if (activeEditorName != null && ws.getEditors().size() > 0) {
-            ws.setActiveEditor(ws.getEditors().get(0)); // 简化：将第一个设为活动
-        }
-        return ws;
+    public List<String> getEditorNames() {
+        return editorNames;
+    }
+
+    public void setEditorNames(List<String> editorNames) {
+        this.editorNames = editorNames;
+    }
+
+    public Map<String, Boolean> getLoggingEnabledMap() {
+        return loggingEnabledMap;
+    }
+
+    public void setLoggingEnabledMap(Map<String, Boolean> loggingEnabledMap) {
+        this.loggingEnabledMap = loggingEnabledMap;
+    }
+
+    @Override
+    public String toString() {
+        return "WorkspaceState{" +
+                "editorCount=" + editorCount +
+                ", activeEditorName='" + activeEditorName + '\'' +
+                ", editorNames=" + editorNames +
+                ", loggingEnabledMap=" + loggingEnabledMap +
+                '}';
     }
 }

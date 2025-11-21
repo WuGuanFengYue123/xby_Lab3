@@ -17,8 +17,9 @@
     <modules>
         <module>core</module>
         <module>plugins/core-impl</module>
+        <module>plugins/cli-jline</module>
     </modules>
-
+    
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
