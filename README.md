@@ -30,6 +30,7 @@ Lab1 实现了一个**基于命令行的文本编辑器**，支持以下核心�
 ```bash
 git clone https://github.com/zzk39/DesignPatternLab.git
 cd DesignPatternLab
+#请根据页面最下方脚本配置环境
 ```
 
 ### 2️⃣ 编译项目
