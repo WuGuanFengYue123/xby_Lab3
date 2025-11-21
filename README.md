@@ -4,312 +4,308 @@ For course: *Advanced Software Development Techniques 25*
 # Team20 文本编辑器
 
 > 基于命令行的模块化文本编辑器 | 设计模式实践项目  
-> **团队**: Team20 | **维护者**: @team20 | **更新**: 2025-11-05
+> **团队**: Team20 | **维护者**: @team20 | **更新**: 2025-11-21
 
 ---
 
-#  实现进度
-```text
-### 命令速查表 
+## 📋 Lab1 功能概述
 
-#### 工作区命令
-| 命令 | 功能 | 必需参数 | 可选参数 |
-|------|------|---------|---------|
-| ✅`load <file>` | 加载文件 | 文件路径 | - | 
-| ✅`save [file\|all]` | 保存文件 | - | file/all |  
-| ✅`init <file> [with-log]` | 创建新缓冲区 | 文件 | with-log |
-| ✅`close [file]` | 关闭文件 | - | file |
-| ✅`edit <file>` | 切换活动文件 | 文件 | - |
-| ✅`editor-list` | 显示文件列表 | - | - |
-| ⌛️`dir-tree [path]` | 显示目录树 | - | path | 
-| ✅`undo` | 撤销 | - | - |
-| ✅`redo` | 重做 | - | - |
-| ✅`exit` | 退出程序 | - | - | 
+Lab1 实现了一个**基于命令行的文本编辑器**，支持以下核心功能：
 
-#### 文本编辑命令
+- **工作区管理**：支持同时打开多个文本文件，管理活动文件和编辑器状态
+- **文本编辑**：基本的文本编辑操作（追加、插入、删除、替换、显示）
+- **撤销/重做**：支持编辑操作的撤销和重做
+- **日志记录**：可选的命令执行日志，支持 `.filename.log` 格式
+- **状态持久化**：工作区状态自动保存到 `.workspace.state`，下次启动时恢复
 
-| 命令                              | 功能     | 适用文件 |
-| --------------------------------- | -------- | -------- |
-| ✅`append "text"`                   | 追加文本 | .txt     |
-| ✅`insert <line:col> "text"`        | 插入文本 | .txt     |
-| ✅`delete <line:col> <len>`         | 删除字符 | .txt     |
-| ✅`replace <line:col> <len> "text"` | 替换文本 | .txt     |
-| ✅`show [start:end]`                | 显示内容 | .txt     |
+---
 
-#### 日志命令
+## 🚀 快速开始
 
-| 命令              | 功能     |
-| ----------------- | -------- |
-| ⌛️`log-on [file]`   | 启用日志 |
-| ⌛️`log-off [file]`  | 关闭日志 |
-| ⌛️`log-show [file]` | 显示日志 |
-
-```
-
-## 🚀 快速开始（3 步）
-
-### 所有平台通用
-方法 1: Docker + VS Code（推荐，零配置）
-
-方法 2: 本地环境 macos/linux/wsl/windows
-
-
-
-
-
-# 方法 1: Docker + VS Code（推荐，零配置）
+### 前置要求
+- Java 17 或更高版本
+- Maven 3.6 或更高版本
 
 ### 1️⃣ 克隆项目
-git clone https://github.com/zzk39/design_pattern_lab.git
+```bash
+git clone https://github.com/zzk39/DesignPatternLab.git
+cd DesignPatternLab
+```
 
-cd design_pattern_lab
+### 2️⃣ 编译项目
+```bash
+# Linux/macOS/WSL
+./mvnw clean package
 
-### 2️⃣ 用 VS Code 打开
-### 3️⃣ 在弹出提示中点击 "Reopen in Container"
-### 或按 F1 → 输入 "Reopen in Container"
-#### ✅ 自动完成！容器会自动：
-####   - 安装 Java 17
-####   - 配置 Maven
-####   - 编译项目
-####   - 运行验证
+# Windows
+mvnw.cmd clean package
+```
 
-### 4️⃣ 配置环境（自动安装配置）
-./setup_env.sh
-
-### 5️⃣ 验证环境（容器内自动打开终端）
-./verify_env.sh
-
-### 6️⃣ 运行程序
+### 3️⃣ 运行程序
+```bash
+# Linux/macOS/WSL
 ./build.sh run
 
+# Windows
+build.bat run
+```
 
-# 方法 2: 本地环境 macos/linux/wsl/windows（3 步）
+或者直接使用 Maven：
+```bash
+mvn exec:java -pl core -Dexec.mainClass="com.team20.editor.Main"
+```
 
-### 1️⃣ 克隆项目
-git clone https://github.com/zzk39/design_pattern_lab.git
+### 4️⃣ 运行测试
+```bash
+# 运行所有测试
+mvn test
 
-cd design_pattern_lab
-
-### 2️⃣ 配置环境（自动安装配置）
-./setup_env.sh      # Linux/macOS/WSL
-
-setup_env.bat       # Windows
-
-# 3️⃣ 验证并运行
-./verify_env.sh && ./build.sh run      # Linux/macOS/WSL
-
-verify_env.bat && build.bat run        # Windows
-
-
-
-
-## 📁 完整目录树
-
-# 项目结构 (Tree 视图)
-
-> 该视图以 Markdown 形式渲染，效果与 `tree` 命令一致，便于在 GitHub/VS Code 中直观查看。
-
-```text
-.
-├── build.bat
-├── build.sh
-├── docs
-│   ├── api
-│   ├── design
-│   │   └── ADAPTER_TREE.md
-│   └── user-guide
-├── mvnw
-├── mvnw.cmd
-├── pom.xml
-├── README.md
-├── scripts
-├── setup_env.bat
-├── setup_env.sh
-├── setup_project_env.sh
-├── setup_project.sh
-├── src
-│   ├── main
-│   │   ├── java
-│   │   │   └── com
-│   │   │       └── team20
-│   │   │           └── editor
-│   │   │               ├── bootstrap
-│   │   │               │   └── ApplicationContext.java
-│   │   │               ├── domain
-│   │   │               │   ├── command
-│   │   │               │   │   ├── CommandDescriptor.java
-│   │   │               │   │   ├── CommandInvoker.java
-│   │   │               │   │   ├── Command.java
-│   │   │               │   │   ├── impl
-│   │   │               │   │   │   ├── logging
-│   │   │               │   │   │   │   ├── LoggingCommandProvider.java
-│   │   │               │   │   │   │   ├── LogOffCommand.java
-│   │   │               │   │   │   │   ├── LogOnCommand.java
-│   │   │               │   │   │   │   └── LogShowCommand.java
-│   │   │               │   │   │   ├── text
-│   │   │               │   │   │   │   ├── AppendCommand.java
-│   │   │               │   │   │   │   ├── DeleteCommand.java
-│   │   │               │   │   │   │   ├── InsertCommand.java
-│   │   │               │   │   │   │   ├── ReplaceCommand.java
-│   │   │               │   │   │   │   └── ShowCommand.java
-│   │   │               │   │   │   └── workspace
-│   │   │               │   │   │       ├── CloseCommand.java
-│   │   │               │   │   │       ├── EditCommand.java
-│   │   │               │   │   │       ├── EditorListCommand.java
-│   │   │               │   │   │       ├── LoadCommand.java
-│   │   │               │   │   │       └── SaveCommand.java
-│   │   │               │   │   ├── README.md
-│   │   │               │   │   ├── registry
-│   │   │               │   │   │   └── AutoLoadingCommandRegistry.java
-│   │   │               │   │   └── UndoableCommand.java
-│   │   │               │   ├── editor
-│   │   │               │   │   ├── AbstractEditor.java
-│   │   │               │   │   ├── Editor.java
-│   │   │               │   │   ├── README.md
-│   │   │               │   │   └── text
-│   │   │               │   │       ├── README.md
-│   │   │               │   │       ├── TextEditor.java
-│   │   │               │   │       └── TextEditorProvider.java
-│   │   │               │   └── workspace
-│   │   │               │       ├── README.md
-│   │   │               │       ├── Workspace.java
-│   │   │               │       ├── WorkspaceMemento.java
-│   │   │               │       └── WorkspaceState.java
-│   │   │               ├── extension
-│   │   │               │   ├── registry
-│   │   │               │   │   ├── AutoLoadingEditorRegistry.java
-│   │   │               │   │   ├── CommandRegistry.java
-│   │   │               │   │   ├── EditorFactory.java
-│   │   │               │   │   ├── EditorRegistry.java
-│   │   │               │   │   └── TextEditorFactory.java
-│   │   │               │   └── spi
-│   │   │               │       ├── command
-│   │   │               │       │   ├── CommandDescriptor.java
-│   │   │               │       │   └── CommandProvider.java
-│   │   │               │       ├── editor
-│   │   │               │       │   └── EditorProvider.java
-│   │   │               │       ├── node
-│   │   │               │       │   └── NodeAdapterProvider.java
-│   │   │               │       └── serialization
-│   │   │               │           └── SerializerProvider.java
-│   │   │               ├── infrastructure
-│   │   │               │   ├── event
-│   │   │               │   │   ├── CommandEvent.java
-│   │   │               │   │   ├── EventBus.java
-│   │   │               │   │   ├── Event.java
-│   │   │               │   │   ├── EventListener.java
-│   │   │               │   │   ├── EventPublisher.java
-│   │   │               │   │   ├── SimpleEventBus.java
-│   │   │               │   │   └── WorkspaceEvent.java
-│   │   │               │   └── persistence
-│   │   │               │       ├── DefaultSerializerProvider.java
-│   │   │               │       ├── JsonSerializer.java
-│   │   │               │       ├── PersistenceManager.java
-│   │   │               │       └── Serializer.java
-│   │   │               ├── Main.java
-│   │   │               ├── monitoring
-│   │   │               │   └── logging
-│   │   │               │       ├── ConsoleLogSink.java
-│   │   │               │       ├── FileLogSink.java
-│   │   │               │       ├── Logger.java
-│   │   │               │       ├── LogListener.java
-│   │   │               │       └── LogSink.java
-│   │   │               ├── representation
-│   │   │               │   ├── tree
-│   │   │               │   │   ├── AbstractNodeAdapter.java
-│   │   │               │   │   ├── adapters
-│   │   │               │   │   │   ├── CommandTypeNodeAdapter.java
-│   │   │               │   │   │   ├── EditorNodeAdapter.java
-│   │   │               │   │   │   ├── RootNodeAdapter.java
-│   │   │               │   │   │   └── WorkspaceNodeAdapter.java
-│   │   │               │   │   ├── NodeAdapterFactory.java
-│   │   │               │   │   ├── Node.java
-│   │   │               │   │   ├── NodeTreeBuilder.java
-│   │   │               │   │   ├── NodeVisitor.java
-│   │   │               │   │   └── providers
-│   │   │               │   │       └── CoreNodeAdapterProvider.java
-│   │   │               │   └── ui
-│   │   │               │       ├── CommandLineInterface.java
-│   │   │               │       ├── CommandParser.java
-│   │   │               │       └── OutputFormatter.java
-│   │   │               └── util
-│   │   │                   ├── FileUtil.java
-│   │   │                   ├── StringUtil.java
-│   │   │                   └── ValidationUtil.java
-│   │   └── resources
-│   │       ├── config
-│   │       ├── META-INF
-│   │       │   └── services
-│   │       │       ├── com.team20.editor.extension.spi.command.CommandProvider
-│   │       │       ├── com.team20.editor.extension.spi.editor.EditorProvider
-│   │       │       ├── com.team20.editor.extension.spi.node.NodeAdapterProvider
-│   │       │       └── com.team20.editor.extension.spi.serialization.SerializerProvider
-│   │       └── templates
-│   └── test
-│       ├── java
-│       │   └── com
-│       │       └── team20
-│       │           └── editor
-│       │               ├── core
-│       │               │   ├── command
-│       │               │   │   └── impl
-│       │               │   │       ├── logging
-│       │               │   │       ├── text
-│       │               │   │       └── workspace
-│       │               │   ├── editor
-│       │               │   │   └── text
-│       │               │   ├── event
-│       │               │   └── workspace
-│       │               ├── logging
-│       │               ├── MainTest.java
-│       │               ├── persistence
-│       │               ├── registry
-│       │               ├── ui
-│       │               └── util
-│       └── resources
-├── target
-├── verify_env.bat
-├── verify_env.sh
-├── 设计模式_lab1.md
-└── 设计模式Lab说明.md
+# 运行特定模块的测试
+mvn test -pl core
+mvn test -pl plugins/core-impl
 ```
 
 ---
 
-项目各主要分支简要说明
+## 📝 命令速查表
 
-- build.bat / build.sh  
-  平台构建脚本（Windows / 类 Unix）。用于在不同操作系统上一键构建与运行项目。
+### 工作区命令
+| 命令 | 功能 | 示例 |
+|------|------|------|
+| `load <file>` | 加载文件 | `load test.txt` |
+| `save [file\|all]` | 保存文件 | `save` / `save test.txt` / `save all` |
+| `init <file> [with-log]` | 创建新缓冲区 | `init new.txt` / `init log.txt with-log` |
+| `close [file]` | 关闭文件 | `close` / `close test.txt` |
+| `edit <file>` | 切换活动文件 | `edit test.txt` |
+| `editor-list` | 显示文件列表 | `editor-list` |
+| `dir-tree [path]` | 显示目录树 | `dir-tree` / `dir-tree src` |
+| `undo` | 撤销 | `undo` |
+| `redo` | 重做 | `redo` |
+| `exit` | 退出程序 | `exit` |
 
-- docs/  
-  项目文档：包含设计（design）、API 文档（api）与用户指南（user-guide），便于新成员阅读架构与使用说明。
+### 文本编辑命令
 
-  - design/ADAPTER_TREE.md  
-    说明如何把域对象适配为统一的树形 Node（Adapter + Composite），便于 UI 展示与扩展。
+| 命令 | 功能 | 示例 |
+|------|------|------|
+| `append "text"` | 追加文本 | `append "Hello World"` |
+| `insert <line:col> "text"` | 插入文本 | `insert 1:1 "Hello"` |
+| `delete <line:col> <len>` | 删除字符 | `delete 1:1 5` |
+| `replace <line:col> <len> "text"` | 替换文本 | `replace 1:1 5 "Hi"` |
+| `show [start:end]` | 显示内容 | `show` / `show 1:10` |
 
-- mvnw / mvnw.cmd & pom.xml  
-  Maven wrapper 与构建配置，保证在任意环境用固定的 Maven 版本构建与打包。
+### 日志命令
 
-- src/main/java/com/team20/editor/bootstrap/ApplicationContext.java  
-  应用上下文与装配点：通过 ServiceLoader 加载 Provider、组装 CommandRegistry、EditorRegistry、EventBus、LogSink 与 Serializer 等运行时组件。
+| 命令 | 功能 | 示例 |
+|------|------|------|
+| `log-on [file]` | 启用日志 | `log-on` / `log-on test.txt` |
+| `log-off [file]` | 关闭日志 | `log-off` |
+| `log-show [file]` | 显示日志 | `log-show` |
 
-- src/main/java/com/team20/editor/domain/**  
-  领域模型（命令 / 编辑器 / 工作区）与核心接口。业务逻辑应尽量放在 domain 层并保持稳定契约。
+---
 
-- src/main/java/com/team20/editor/extension/**  
-  扩展点（registry / spi）实现：所有可插拔的 Provider 接口与注册中心，支持通过添加类与 META-INF/services 文件扩展系统而无需修改核心代码（符合 OCP）。
+## 💡 使用示例
 
-- src/main/java/com/team20/editor/infrastructure/**  
-  基础设施实现：事件总线、持久化、序列化器等底层实现，domain 层通过接口依赖这些实现（符合 DIP）。
+### 示例 1: 创建并编辑文件
+```bash
+> init hello.txt
+Created new buffer: hello.txt
 
-- src/main/java/com/team20/editor/monitoring/logging/**  
-  日志/监控扩展点：LogSink、ConsoleLogSink、FileLogSink 与 LogListener（可订阅 EventBus 事件进行日志记录）。
+> append "Hello, World!"
+Appended line.
 
-- src/main/java/com/team20/editor/representation/tree/**  
-  视图模型与适配器（Node、NodeAdapterFactory、NodeTreeBuilder、各类 Adapter），实现 Adapter + Composite，用于构建统一的树形表示以供 UI/CLI 展示。
+> append "Welcome to Team20 Editor"
+Appended line.
 
-- src/main/java/com/team20/editor/representation/ui/**  
-  CLI 相关实现（命令行解析、输出格式化），将用户输入映射到 Command 并执行。
+> show
+1: Hello, World!
+2: Welcome to Team20 Editor
 
-- src/main/resources/META-INF/services/**  
-  ServiceLoader 的资源定义文件（文件名为接口完全限定名），用于在运行时自动发现并加载实现类（例如 CommandProvider、EditorProvider、SerializerProvider、NodeAdapterProvider）。
+> save
+Saved: hello.txt
+```
+
+### 示例 2: 启用日志记录
+```bash
+> init log-test.txt with-log
+Created new buffer: log-test.txt (logging enabled)
+
+> append "First line"
+Appended line.
+
+> save
+Saved: log-test.txt
+
+> log-show
+session start at 20251121 18:05:00
+20251121 18:05:05 append "First line"
+20251121 18:05:10 save
+```
+
+### 示例 3: 多文件编辑
+```bash
+> load file1.txt
+Loaded: file1.txt
+
+> load file2.txt
+Loaded: file2.txt
+
+> editor-list
+* file2.txt
+  file1.txt
+
+> edit file1.txt
+Switched to: file1.txt
+
+> editor-list
+* file1.txt
+  file2.txt
+```
+
+---
+
+## 📂 文件存储位置
+
+### 工作区状态
+- **文件**: `.workspace.state`
+- **位置**: 程序运行目录
+- **内容**: 打开的文件列表、当前活动文件、日志开关状态等
+- **格式**: JSON
+
+### 日志文件
+- **文件**: `.filename.log` (例如 `.test.txt.log`)
+- **位置**: 程序运行目录
+- **内容**: 命令执行历史和时间戳
+- **格式**: 纯文本，每行一条命令记录
+
+### 遗留标记迁移
+- 旧版本使用 `.filename.log.enabled` 文件标记日志开关
+- Lab1 启动时自动迁移到工作区状态，并删除旧标记文件
+
+---
+
+## 🏗️ 项目结构
+
+```
+DesignPatternLab/
+├── core/                           # 核心模块
+│   └── src/
+│       ├── main/java/com/team20/editor/
+│       │   ├── bootstrap/          # 应用程序引导和上下文
+│       │   ├── domain/             # 领域模型
+│       │   │   ├── command/        # 命令模式实现
+│       │   │   ├── editor/         # 编辑器接口和实现
+│       │   │   └── workspace/      # 工作区管理
+│       │   ├── extension/          # 扩展点和 SPI
+│       │   ├── infrastructure/     # 基础设施（事件、持久化）
+│       │   ├── monitoring/         # 日志和监控
+│       │   └── Main.java           # 程序入口
+│       └── test/                   # 单元测试
+├── plugins/                        # 插件模块
+│   ├── core-impl/                  # 核心命令实现
+│   └── cli-jline/                  # JLine CLI 插件
+├── README.md                       # 本文档
+├── pom.xml                         # Maven 项目配置
+└── build.sh / build.bat           # 构建脚本
+```
+
+---
+
+## 🧪 测试
+
+项目使用 JUnit 5 进行单元测试和集成测试。
+
+### 运行测试
+```bash
+# 运行所有测试
+mvn test
+
+# 运行指定模块测试
+mvn test -pl core
+mvn test -pl plugins/core-impl
+
+# 运行特定测试类
+mvn test -Dtest=WorkspaceTest
+
+# 查看测试覆盖率
+mvn test jacoco:report
+```
+
+### 测试结构
+- `core/src/test/` - 核心模块测试
+- `plugins/*/src/test/` - 插件模块测试
+
+---
+
+## 🔧 开发环境设置
+
+### 方法 1: Docker + VS Code（推荐）
+
+1. 安装 Docker 和 VS Code
+2. 安装 VS Code 扩展：Dev Containers
+3. 打开项目文件夹
+4. 选择 "Reopen in Container"
+5. 容器会自动配置 Java 17 和 Maven
+
+### 方法 2: 本地环境
+
+#### Linux/macOS/WSL
+```bash
+# 配置环境
+./setup_env.sh
+
+# 验证环境
+./verify_env.sh
+
+# 运行程序
+./build.sh run
+```
+
+#### Windows
+```cmd
+REM 配置环境
+setup_env.bat
+
+REM 验证环境
+verify_env.bat
+
+REM 运行程序
+build.bat run
+```
+
+---
+
+## 📚 设计模式应用
+
+Lab1 应用了以下设计模式：
+
+1. **命令模式 (Command Pattern)**: 实现可撤销/重做的编辑操作
+2. **备忘录模式 (Memento Pattern)**: 工作区状态的持久化和恢复
+3. **观察者模式 (Observer Pattern)**: 事件系统和日志监听
+4. **工厂模式 (Factory Pattern)**: 编辑器和命令的创建
+5. **单例模式 (Singleton Pattern)**: 命令注册表和应用程序上下文
+6. **策略模式 (Strategy Pattern)**: 序列化和日志输出策略
+7. **适配器模式 (Adapter Pattern)**: 树形视图适配器
+
+---
+
+## 🤝 贡献指南
+
+1. Fork 项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+---
+
+## 📄 许可证
+
+本项目仅供课程学习使用。
+
+---
+
+## 📞 联系方式
+
+- **项目仓库**: https://github.com/zzk39/DesignPatternLab
+- **课程**: Advanced Software Development Techniques 25
+- **团队**: Team20
