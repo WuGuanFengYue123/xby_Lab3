@@ -93,7 +93,7 @@ case "${1:-}" in
     modules_csv="${MAIN_MODULE_DIR}"
     for p in "${PLUGINS[@]}"; do modules_csv+=",${p}"; done
     echo "Building modules: ${modules_csv}"
-    "${MAVEN}" -am -pl "${modules_csv}" -DskipTests clean package
+    "${MAVEN}" -am -pl "${modules_csv}" -DskipTests clean install
     echo "Copying core runtime dependencies..."
     copy_core_dependencies
     echo "Copying plugin runtime dependencies..."
