@@ -17,8 +17,8 @@ For course: *Advanced Software Development Techniques 25*
 |------|------|---------|---------|
 | ✅`load <file>` | 加载文件 | 文件路径 | - | 
 | ✅`save [file\|all]` | 保存文件 | - | file/all |  
-| ⌛️`init <file> [with-log]` | 创建新缓冲区 | 文件 | with-log |
-| ⌛️`close [file]` | 关闭文件 | - | file |
+| ✅`init <file> [with-log]` | 创建新缓冲区 | 文件 | with-log |
+| ✅`close [file]` | 关闭文件 | - | file |
 | ✅`edit <file>` | 切换活动文件 | 文件 | - |
 | ✅`editor-list` | 显示文件列表 | - | - |
 | ⌛️`dir-tree [path]` | 显示目录树 | - | path | 
