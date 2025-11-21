@@ -12,6 +12,7 @@ import com.team20.editor.infrastructure.event.SimpleEventBus;
 import com.team20.editor.infrastructure.persistence.Serializer;
 import com.team20.editor.infrastructure.persistence.PersistenceManager;
 import com.team20.editor.monitoring.logging.LogSink;
+import com.team20.editor.monitoring.logging.LogListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,9 +24,9 @@ import java.util.ServiceLoader;
  * 说明：
  * - 不再直接构造任何具体实现（例如 ConsoleLogSink、JsonSerializer、TextEditor 等）。
  * - 运行时通过 ServiceLoader 加载所需的 SPI/实现：
- *   - EditorProvider(s) -> 注入 EditorFactory
- *   - SerializerProvider -> 获取 Serializer 用于 PersistenceManager
- *   - LogSink implementations -> 选择第一个（可改为策略选择）
+ * - EditorProvider(s) -> 注入 EditorFactory
+ * - SerializerProvider -> 获取 Serializer 用于 PersistenceManager
+ * - LogSink implementations -> 选择第一个（可改为策略选择）
  * - 严格策略：若任一必需实现缺失，则在构造时抛 IllegalStateException 并中止启动。
  */
 public final class ApplicationContext {
@@ -38,8 +39,22 @@ public final class ApplicationContext {
     private final EditorFactory editorFactory;
     private final List<EditorProvider> editorProviders = new ArrayList<>();
 
+    // keep a reference to the log listener so we can inject Workspace later
+    private final LogListener logListener;
+
     public ApplicationContext() {
         this.eventBus = new SimpleEventBus();
+
+        // Subscribe LogListener so it receives CommandEvent and writes per-file logs
+        LogListener listener = new LogListener();
+        this.logListener = listener;
+        try {
+            this.eventBus.subscribe(listener);
+        } catch (Throwable t) {
+            // protect startup if listener fails to initialize — log to stderr but continue
+            System.err.println("Warning: LogListener failed to subscribe: " + t.getMessage());
+        }
+
         this.commandRegistry = new AutoLoadingCommandRegistry();
         this.commandInvoker = new CommandInvoker();
 
@@ -63,7 +78,8 @@ public final class ApplicationContext {
         ServiceLoader<SerializerProvider> loader = ServiceLoader.load(SerializerProvider.class);
         for (SerializerProvider sp : loader) {
             Serializer s = sp.getSerializer();
-            if (s != null) return s;
+            if (s != null)
+                return s;
         }
         throw new IllegalStateException("没有找到任何 SerializerProvider 实现（用于 Persistence）。请提供一个插件实现。");
     }
@@ -71,9 +87,11 @@ public final class ApplicationContext {
     private LogSink loadLogSink() {
         ServiceLoader<LogSink> loader = ServiceLoader.load(LogSink.class);
         for (LogSink ls : loader) {
-            if (ls != null) return ls;
+            if (ls != null)
+                return ls;
         }
-        throw new IllegalStateException("没有找到任何 LogSink 实现。请提供一个实现并在 META-INF/services/com.team20.editor.monitoring.logging.LogSink 中注册。");
+        throw new IllegalStateException(
+                "没有找到任何 LogSink 实现。请提供一个实现并在 META-INF/services/com.team20.editor.monitoring.logging.LogSink 中注册。");
     }
 
     private void loadEditorProviders() {
@@ -95,6 +113,15 @@ public final class ApplicationContext {
         } catch (Throwable t) {
             // ignore
         }
+
+        // inject Workspace into LogListener so it can consult runtime flags
+        try {
+            if (this.logListener != null) {
+                this.logListener.setWorkspace(ws);
+            }
+        } catch (Throwable ignored) {
+        }
+
         return ws;
     }
 

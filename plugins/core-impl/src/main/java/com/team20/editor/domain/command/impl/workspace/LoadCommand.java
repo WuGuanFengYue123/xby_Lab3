@@ -2,61 +2,156 @@ package com.team20.editor.domain.command.impl.workspace;
 
 import com.team20.editor.domain.command.Command;
 import com.team20.editor.domain.editor.Editor;
-import com.team20.editor.domain.editor.text.TextEditor;
 import com.team20.editor.domain.workspace.Workspace;
-import com.team20.editor.extension.registry.EditorFactory;
 import com.team20.editor.infrastructure.persistence.PersistenceManager;
+import com.team20.editor.extension.registry.EditorFactory;
+import com.team20.editor.extension.registry.DefaultCommandRegistry;
+import com.team20.editor.bootstrap.ApplicationContext;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.io.BufferedReader;
+import java.io.StringReader;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
- * load <filepath>：从磁盘加载文件到工作区（通过 EditorFactory 创建 Editor）
+ * LoadCommand: loads a file from persistence and adds editor to workspace.
  *
- * 构造时注入 EditorFactory 与 PersistenceManager。
+ * Behaviour:
+ * - loads file content into an Editor and makes it active
+ * - if file does not exist -> create a new editor with empty content and mark
+ * it as modified (unsaved)
+ * - if the first non-empty line equals "# log", enable runtime logging for this
+ * file
+ * via workspace.setLoggingEnabled(...) (no marker files), append a
+ * session-start
+ * line into .<name>.log and persist workspace state (best-effort)
  */
 public class LoadCommand implements Command {
 
-    private final PersistenceManager pm;
     private final EditorFactory editorFactory;
-    private String filepath; // 设置为相对或绝对路径
+    private final PersistenceManager persistenceManager;
+    private final String filepath;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd HH:mm:ss");
 
-    public LoadCommand(EditorFactory factory, PersistenceManager pm) {
-        this.editorFactory = factory;
-        this.pm = pm;
-    }
-
-    public LoadCommand(EditorFactory factory, PersistenceManager pm, String filepath) {
-        this.editorFactory = factory;
-        this.pm = pm;
+    public LoadCommand(EditorFactory editorFactory, PersistenceManager persistenceManager, String filepath) {
+        this.editorFactory = editorFactory;
+        this.persistenceManager = persistenceManager;
         this.filepath = filepath;
     }
 
-    public void setFilepath(String filepath) { this.filepath = filepath; }
-
     @Override
     public void execute(Workspace workspace) {
-        if (filepath == null || filepath.isBlank()) {
-            System.out.println("Usage: load <filepath>");
-            return;
-        }
+        boolean createdNew = false;
+        String content = "";
         try {
-            Path p = Paths.get(filepath);
-            String raw = pm.readFile(p);
-            // 使用 factory 创建 editor（provider 负责决定类型）
-            Editor editor = editorFactory.createEditor(p.toString());
-            editor.loadContent(raw);
+            // try to load content; if file not found or cannot be read, we'll treat as new
+            // file
+            try {
+                content = persistenceManager.load(filepath);
+                if (content == null)
+                    content = "";
+            } catch (Exception loadEx) {
+                // Treat any load failure as "file not present / unreadable" -> create new
+                // editor
+                createdNew = true;
+                content = "";
+            }
+
+            Editor editor = editorFactory.createEditor(filepath);
+            editor.loadContent(content);
             workspace.addEditor(editor);
             workspace.setActiveEditor(editor);
-            System.out.println("已加载文件: " + p.toString());
-            workspace.publishWorkspaceEvent("fileLoaded", p.toString());
-        } catch (Exception e) {
-            System.out.println("加载失败: " + e.getMessage());
-        }
-    }
 
-    @Override
-    public String toString() {
-        return "load " + (filepath == null ? "" : filepath);
+            if (createdNew) {
+                // mark editor as modified (so Close/Exit will prompt to save)
+                try {
+                    // try explicit API setModified(boolean)
+                    Method setModified = editor.getClass().getMethod("setModified", boolean.class);
+                    setModified.invoke(editor, true);
+                } catch (NoSuchMethodException ns1) {
+                    try {
+                        // try markModified()
+                        Method mm = editor.getClass().getMethod("markModified");
+                        mm.invoke(editor);
+                    } catch (NoSuchMethodException ns2) {
+                        try {
+                            // fallback: set a boolean field named "modified"
+                            Field f = editor.getClass().getDeclaredField("modified");
+                            f.setAccessible(true);
+                            f.setBoolean(editor, true);
+                        } catch (Throwable ignored) {
+                            // ignore: best-effort marking
+                        }
+                    } catch (Throwable ignored) {
+                        // ignore
+                    }
+                } catch (Throwable ignored) {
+                    // ignore
+                }
+
+                System.out.println("已创建新文件并标记为已修改: " + filepath);
+                try {
+                    workspace.publishWorkspaceEvent("fileCreated", filepath);
+                } catch (Throwable ignored) {
+                }
+            } else {
+                System.out.println("已加载文件: " + filepath);
+            }
+
+            // Detect first non-empty line. If equals "# log", enable runtime logging.
+            boolean enableLog = false;
+            if (content != null && !content.isBlank()) {
+                try (BufferedReader br = new BufferedReader(new StringReader(content))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        if (line != null && !line.isBlank()) {
+                            if (line.trim().equals("# log")) {
+                                enableLog = true;
+                            }
+                            break;
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+
+            if (enableLog) {
+                // update centralized workspace flag (no marker files)
+                try {
+                    workspace.setLoggingEnabled(filepath, true);
+                } catch (Throwable ignored) {
+                }
+
+                // append session start line to the per-file log
+                String safeName = new File(filepath).getName();
+                File logFile = new File("." + safeName + ".log");
+                try (PrintWriter pw = new PrintWriter(new FileWriter(logFile, true))) {
+                    String session = LocalDateTime.now().format(FORMATTER);
+                    pw.println("session start at " + session);
+                } catch (Exception le) {
+                    System.err.println("Warning: 无法写入 session start 到日志文件: " + le.getMessage());
+                }
+
+                // persist workspace state (best-effort)
+                try {
+                    ApplicationContext ctx = DefaultCommandRegistry.getApplicationContext();
+                    if (ctx != null && ctx.persistenceManager() != null) {
+                        ctx.persistenceManager().saveWorkspaceState(".workspace.state", workspace.getState());
+                    }
+                } catch (Throwable le) {
+                    System.err.println("Warning: 无法持久化工作区状态: " + le.getMessage());
+                }
+
+                System.out.println("日志已启用: " + "." + safeName + ".log");
+            }
+
+        } catch (Exception ex) {
+            System.out.println("加载失败: " + ex.getMessage());
+        }
     }
 }

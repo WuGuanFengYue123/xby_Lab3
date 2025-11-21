@@ -6,6 +6,7 @@ import com.team20.editor.infrastructure.event.EventPublisher;
 import com.team20.editor.infrastructure.event.WorkspaceEvent;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 工作区 - 管理所有打开的编辑器
@@ -20,6 +21,9 @@ public class Workspace {
     private Editor activeEditor;
     // 事件发布器
     private EventPublisher eventPublisher;
+
+    // per-editor runtime flags (persisted via WorkspaceState.loggingEnabled)
+    private final Map<String, Boolean> loggingEnabled = new HashMap<>();
 
     public Workspace() {
     }
@@ -49,6 +53,9 @@ public class Workspace {
         if (activeEditor == null) {
             activeEditor = editor;
         }
+
+        // 保持 loggingEnabled map 与编辑器列表一致：若没有条目，默认 false
+        loggingEnabled.putIfAbsent(filepath, Boolean.FALSE);
     }
 
     /**
@@ -62,6 +69,9 @@ public class Workspace {
         String filepath = editor.getName();
         editors.remove(filepath);
         editorList.remove(editor);
+
+        // remove logging flag (we keep consistency)
+        loggingEnabled.remove(filepath);
 
         // 如果移除的是活动编辑器，切换到其他编辑器
         if (activeEditor == editor) {
@@ -135,21 +145,68 @@ public class Workspace {
     }
 
     /**
+     * 获取编辑器的日志开关状态（true 表示启用）
+     */
+    public boolean isLoggingEnabled(String filepath) {
+        if (filepath == null)
+            return false;
+        Boolean v = loggingEnabled.get(filepath);
+        return v != null && v;
+    }
+
+    /**
+     * 设置某个编辑器的日志开关
+     */
+    public void setLoggingEnabled(String filepath, boolean enabled) {
+        if (filepath == null)
+            return;
+        loggingEnabled.put(filepath, enabled);
+    }
+
+    /**
+     * 返回当前的 logging map（不可修改视图）
+     */
+    public Map<String, Boolean> getLoggingEnabledMap() {
+        return Collections.unmodifiableMap(new HashMap<>(loggingEnabled));
+    }
+
+    /**
      * 获取工作区状态（用于持久化）
      */
     public WorkspaceState getState() {
         WorkspaceState state = new WorkspaceState();
         state.setEditorCount(editorList.size());
         state.setActiveEditorName(activeEditor == null ? null : activeEditor.getName());
-        // 可以扩展更多字段
+        // store editor names only (do not instantiate editors here)
+        state.setEditorNames(editorList.stream().map(Editor::getName).collect(Collectors.toList()));
+        // persist logging flags
+        state.setLoggingEnabledMap(new HashMap<>(this.loggingEnabled));
         return state;
     }
 
     /**
      * 从状态恢复（用于持久化）
+     *
+     * Important: Workspace.restoreState must not directly instantiate concrete
+     * Editor implementations.
+     * The actual creation of Editor instances should be performed by higher-level
+     * code (e.g. ApplicationContext
+     * or PersistenceManager) using EditorFactory / EditorProvider so that concrete
+     * editor implementations
+     * remain in plugins.
+     *
+     * Here we restore only metadata and per-editor flags (like loggingEnabled).
      */
     public void restoreState(WorkspaceState state) {
-        // 暂时保留接口，后续实现
+        if (state == null)
+            return;
+        // restore logging flags and active editor name (editor instances will be
+        // created later by plugin code)
+        Map<String, Boolean> map = state.getLoggingEnabledMap();
+        if (map != null) {
+            loggingEnabled.clear();
+            loggingEnabled.putAll(map);
+        }
     }
 
     @Override

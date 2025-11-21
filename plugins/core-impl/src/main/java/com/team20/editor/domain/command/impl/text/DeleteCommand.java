@@ -1,18 +1,15 @@
 package com.team20.editor.domain.command.impl.text;
 
-import com.team20.editor.domain.command.UndoableCommand;
 import com.team20.editor.domain.editor.text.TextEditor;
-import com.team20.editor.domain.workspace.Workspace;
 
 /**
- * 删除文本命令
+ * Delete command now delegates common behavior to AbstractUndoableTextCommand.
  */
-public class DeleteCommand implements UndoableCommand {
+public class DeleteCommand extends AbstractUndoableTextCommand {
 
     private final int line;
     private final int col;
     private final int length;
-    private TextEditor.EditorSnapshot beforeSnapshot;
 
     public DeleteCommand(int line, int col, int length) {
         if (line < 1 || col < 1) {
@@ -27,46 +24,18 @@ public class DeleteCommand implements UndoableCommand {
     }
 
     @Override
-    public void execute(Workspace workspace) {
-        TextEditor editor = getTextEditor(workspace);
-
-        beforeSnapshot = editor.createSnapshot();
+    protected void apply(TextEditor editor) {
         editor.delete(line, col, length);
-
-        workspace.publishCommandEvent("delete",
-                String.format("%d:%d %d", line, col, length));
     }
 
     @Override
-    public void undo(Workspace workspace) {
-        if (beforeSnapshot == null) {
-            throw new IllegalStateException("无法撤销：命令尚未执行");
-        }
-
-        TextEditor editor = getTextEditor(workspace);
-        editor.restoreSnapshot(beforeSnapshot);
-
-        workspace.publishCommandEvent("undo", "delete");
+    protected String getCommandName() {
+        return "delete";
     }
 
     @Override
-    public void redo(Workspace workspace) {
-        TextEditor editor = getTextEditor(workspace);
-        TextEditor.EditorSnapshot temp = beforeSnapshot;
-        execute(workspace);
-        beforeSnapshot = temp;
-
-        workspace.publishCommandEvent("redo", "delete");
-    }
-
-    private TextEditor getTextEditor(Workspace workspace) {
-        if (workspace.getActiveEditor() == null) {
-            throw new IllegalStateException("没有打开的文件");
-        }
-        if (!(workspace.getActiveEditor() instanceof TextEditor)) {
-            throw new IllegalStateException("当前文件不是文本文件");
-        }
-        return (TextEditor) workspace.getActiveEditor();
+    protected String formatArgs() {
+        return String.format("%d:%d %d", line, col, length);
     }
 
     @Override

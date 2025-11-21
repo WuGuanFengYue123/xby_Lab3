@@ -2,29 +2,77 @@ package com.team20.editor.domain.command.impl.logging;
 
 import com.team20.editor.domain.command.Command;
 import com.team20.editor.domain.workspace.Workspace;
+import com.team20.editor.extension.registry.DefaultCommandRegistry;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
- * 开启日志（最小适配）：execute 接受 Workspace 参数以匹配新的 Command 接口契约。
+ * log-on [file] - enable logging for specified file or current active file.
+ *
+ * New behaviour (no backward-compat marker files):
+ * - Set workspace logging flag via workspace.setLoggingEnabled(...)
+ * - Write session header to .<name>.log
+ * - Persist workspace state (best-effort)
  */
 public class LogOnCommand implements Command {
-    private final Workspace workspace;
-    private final String source;
 
-    public LogOnCommand(Workspace workspace, String source) {
-        this.workspace = workspace;
-        this.source = source;
+    private final String filepath;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd HH:mm:ss");
+
+    public LogOnCommand() {
+        this.filepath = null;
     }
 
-    // 无参构造用于 Provider 默认创建（占位 Workspace）
-    public LogOnCommand() {
-        this(new Workspace(), "default");
+    public LogOnCommand(String filepath) {
+        this.filepath = (filepath == null || filepath.isBlank()) ? null : filepath.trim();
     }
 
     @Override
     public void execute(Workspace workspace) {
-        // 使用传入的 workspace（优先使用参数），保留旧的 source 字段用于日志来源显示
-        Workspace ws = workspace != null ? workspace : this.workspace;
-        // TODO: 实际逻辑（例如通过 ws 注册日志监听器）
-        System.out.println("[log:on] logging enabled via " + source);
+        String target = filepath;
+        if (target == null) {
+            var active = workspace.getActiveEditor();
+            if (active == null) {
+                System.out.println("没有打开的文件");
+                return;
+            }
+            target = active.getName();
+        }
+
+        String safeName = new File(target).getName();
+        File logFile = new File("." + safeName + ".log");
+
+        try {
+            // ensure log file exists and write session header
+            try (PrintWriter pw = new PrintWriter(new FileWriter(logFile, true))) {
+                String session = LocalDateTime.now().format(FORMATTER);
+                pw.println("session start at " + session);
+            }
+
+            // update centralized workspace state
+            workspace.setLoggingEnabled(target, true);
+
+            // persist workspace state (best-effort)
+            try {
+                var ctx = DefaultCommandRegistry.getApplicationContext();
+                if (ctx != null && ctx.persistenceManager() != null) {
+                    ctx.persistenceManager().saveWorkspaceState(".workspace.state", workspace.getState());
+                }
+            } catch (Throwable ignored) {
+            }
+
+            System.out.println("日志已启用: " + logFile.getName());
+        } catch (Exception ex) {
+            System.out.println("启用日志时发生错误: " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "log-on " + (filepath == null ? "" : filepath);
     }
 }

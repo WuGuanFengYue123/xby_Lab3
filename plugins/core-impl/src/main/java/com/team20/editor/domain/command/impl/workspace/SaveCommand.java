@@ -19,6 +19,7 @@ import java.nio.file.Paths;
  * - 否则将当前活动编辑器内容保存为指定路径（"另存为" 行为）。
  *
  * 保存成功后会尝试清除编辑器的修改标记（若编辑器实现了 setModified(boolean) 方法）。
+ * 现在也会发布 command 事件（workspace.publishCommandEvent）以确保日志能记录 save 操作。
  */
 public class SaveCommand implements Command {
 
@@ -73,6 +74,11 @@ public class SaveCommand implements Command {
             clearModifiedFlag(active);
             System.out.println("已保存到: " + target);
             workspace.publishWorkspaceEvent("fileSaved", target);
+            // publish command event so logging records the save
+            try {
+                workspace.publishCommandEvent("save", target);
+            } catch (Throwable ignored) {
+            }
         } catch (Exception e) {
             System.out.println("保存失败: " + e.getMessage());
         }
@@ -91,6 +97,11 @@ public class SaveCommand implements Command {
                 pm.writeFile(Paths.get(target), e.getContent());
                 clearModifiedFlag(e);
                 success++;
+                // publish per-file command event so logging records each save
+                try {
+                    workspace.publishCommandEvent("save", target);
+                } catch (Throwable ignored) {
+                }
             } catch (Exception ex) {
                 System.out.println("保存 " + target + " 失败: " + ex.getMessage());
                 fail++;
@@ -112,6 +123,10 @@ public class SaveCommand implements Command {
             clearModifiedFlag(active);
             System.out.println("已保存到: " + path);
             workspace.publishWorkspaceEvent("fileSaved", path);
+            try {
+                workspace.publishCommandEvent("save", path);
+            } catch (Throwable ignored) {
+            }
         } catch (Exception e) {
             System.out.println("保存失败: " + e.getMessage());
         }
@@ -123,6 +138,10 @@ public class SaveCommand implements Command {
             clearModifiedFlag(editor);
             System.out.println("已保存: " + targetPath);
             workspace.publishWorkspaceEvent("fileSaved", targetPath);
+            try {
+                workspace.publishCommandEvent("save", targetPath);
+            } catch (Throwable ignored) {
+            }
         } catch (Exception e) {
             System.out.println("保存失败: " + e.getMessage());
         }

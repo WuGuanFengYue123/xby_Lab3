@@ -1,74 +1,106 @@
 package com.team20.editor.plugin.workspace;
 
+import com.team20.editor.domain.command.CommandDescriptor;
 import com.team20.editor.extension.spi.command.CommandProvider;
 import com.team20.editor.extension.registry.CommandRegistry;
-import com.team20.editor.domain.command.Command;
-import com.team20.editor.domain.command.CommandDescriptor; // domain descriptor
-import com.team20.editor.domain.command.impl.workspace.CloseCommand;
-import com.team20.editor.domain.command.impl.workspace.EditCommand;
-import com.team20.editor.domain.command.impl.workspace.SaveCommand;
-import com.team20.editor.domain.command.impl.workspace.LoadCommand;
-import com.team20.editor.domain.command.impl.workspace.RedoCommand;
-import com.team20.editor.domain.command.impl.workspace.EditorListCommand;
-import com.team20.editor.bootstrap.ApplicationContext;
-import com.team20.editor.extension.registry.DefaultCommandRegistry;
 
 import java.util.List;
 
 /**
- * Workspace provider: register factories that create workspace-related
- * commands.
+ * Unified WorkspaceCommandProvider - 注册 workspace 相关命令的工厂
+ *
+ * - 与新的 EditCommand(String) 签名兼容（edit 只切换到已打开的文件）
+ * - Registers common workspace commands: load, init, save, close, edit,
+ * editor-list,
+ * dir-tree, undo, redo, exit, debug-inspect
  */
 public class WorkspaceCommandProvider implements CommandProvider {
 
-    public WorkspaceCommandProvider() {
-        // no registry work in ctor
-    }
+        public WorkspaceCommandProvider() {
+                // no-op
+        }
 
-    @Override
-    public String getProviderName() {
-        return "workspace-provider";
-    }
+        @Override
+        public String getProviderName() {
+                return "workspace-provider";
+        }
 
-    @Override
-    public List<com.team20.editor.domain.command.CommandDescriptor> getCommandDescriptors() {
-        return List.of();
-    }
+        @Override
+        public List<CommandDescriptor> getCommandDescriptors() {
+                // Keep empty or populate with descriptors if you have metadata definitions.
+                return List.of();
+        }
 
-    @Override
-    public void registerFactories(CommandRegistry registry) {
-        registry.registerFactory("save", (rawArgs) -> {
-            ApplicationContext ctx = DefaultCommandRegistry.getApplicationContext();
-            String path = (rawArgs == null || rawArgs.isBlank()) ? null : rawArgs.trim();
-            return new SaveCommand(ctx.persistenceManager(), path);
-        });
+        @Override
+        public void registerFactories(CommandRegistry registry) {
+                // close
+                registry.registerFactory("close",
+                                (rawArgs) -> new com.team20.editor.domain.command.impl.workspace.CloseCommand(rawArgs));
 
-        registry.registerFactory("load", (rawArgs) -> {
-            ApplicationContext ctx = DefaultCommandRegistry.getApplicationContext();
-            if (rawArgs == null || rawArgs.isBlank()) {
-                throw new IllegalArgumentException("load requires a filepath");
-            }
-            return new LoadCommand(ctx.editorFactory(), ctx.persistenceManager(), rawArgs.trim());
-        });
+                // edit (switch to already-open editor)
+                registry.registerFactory("edit",
+                                (rawArgs) -> {
+                                        String arg = (rawArgs == null) ? null : rawArgs.trim();
+                                        if (arg == null || arg.isBlank()) {
+                                                return null;
+                                        }
+                                        return new com.team20.editor.domain.command.impl.workspace.EditCommand(arg);
+                                });
 
-        registry.registerFactory("edit", (rawArgs) -> {
-            ApplicationContext ctx = DefaultCommandRegistry.getApplicationContext();
-            if (rawArgs == null || rawArgs.isBlank()) {
-                throw new IllegalArgumentException("edit requires a filepath");
-            }
-            return new EditCommand(ctx.editorFactory(), ctx.persistenceManager(), rawArgs.trim());
-        });
+                // init (file [with-log])
+                registry.registerFactory("init", (rawArgs) -> {
+                        if (rawArgs == null || rawArgs.isBlank()) {
+                                return new com.team20.editor.domain.command.impl.workspace.InitCommand(null, false);
+                        }
+                        String[] parts = rawArgs.trim().split("\\s+");
+                        String path = parts.length >= 1 ? parts[0] : null;
+                        boolean withLog = (parts.length >= 2) && "with-log".equalsIgnoreCase(parts[1]);
+                        return new com.team20.editor.domain.command.impl.workspace.InitCommand(path, withLog);
+                });
 
-        registry.registerFactory("close", (rawArgs) -> {
-            String path = (rawArgs == null || rawArgs.isBlank()) ? null : rawArgs.trim();
-            return new CloseCommand(path);
-        });
+                // load
+                registry.registerFactory("load",
+                                (rawArgs) -> new com.team20.editor.domain.command.impl.workspace.LoadCommand(
+                                                com.team20.editor.extension.registry.DefaultCommandRegistry
+                                                                .getApplicationContext().editorFactory(),
+                                                com.team20.editor.extension.registry.DefaultCommandRegistry
+                                                                .getApplicationContext().persistenceManager(),
+                                                rawArgs));
 
-        registry.registerFactory("redo", (rawArgs) -> {
-            ApplicationContext ctx = DefaultCommandRegistry.getApplicationContext();
-            return new RedoCommand(ctx.commandInvoker());
-        });
+                // save
+                registry.registerFactory("save",
+                                (rawArgs) -> new com.team20.editor.domain.command.impl.workspace.SaveCommand(
+                                                com.team20.editor.extension.registry.DefaultCommandRegistry
+                                                                .getApplicationContext().persistenceManager(),
+                                                rawArgs));
 
-        registry.registerFactory("editor-list", (rawArgs) -> new EditorListCommand());
-    }
+                // editor-list
+                registry.registerFactory("editor-list",
+                                (rawArgs) -> new com.team20.editor.domain.command.impl.workspace.EditorListCommand());
+
+                // dir-tree
+                registry.registerFactory("dir-tree", (rawArgs) -> {
+                        String p = (rawArgs == null || rawArgs.isBlank()) ? "." : rawArgs.trim();
+                        return new com.team20.editor.domain.command.impl.workspace.DirTreeCommand(p);
+                });
+
+                // undo / redo
+                registry.registerFactory("undo",
+                                (rawArgs) -> new com.team20.editor.domain.command.impl.workspace.UndoCommand());
+                registry.registerFactory("redo",
+                                (rawArgs) -> new com.team20.editor.domain.command.impl.workspace.RedoCommand());
+
+                // exit
+                registry.registerFactory("exit",
+                                (rawArgs) -> new com.team20.editor.domain.command.impl.workspace.ExitCommand());
+
+                // debug-inspect
+                registry.registerFactory("debug-inspect",
+                                (rawArgs) -> new com.team20.editor.domain.command.impl.workspace.DebugInspectCommand());
+        }
+
+        @Override
+        public String toString() {
+                return "WorkspaceCommandProvider";
+        }
 }
