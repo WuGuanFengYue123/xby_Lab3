@@ -95,6 +95,7 @@ public final class Main {
             } catch (NoSuchMethodException | IllegalAccessException
                     | java.lang.reflect.InvocationTargetException ex) {
                 System.err.println("Optional CLI plugin exists but cannot invoke entry point run(ApplicationContext,Workspace): " + ex.getMessage());
+                System.err.println("Falling back to built-in command loop. To use the enhanced CLI, check plugin compatibility.");
                 // fall back to built-in loop
             }
         } catch (ClassNotFoundException ignored) {

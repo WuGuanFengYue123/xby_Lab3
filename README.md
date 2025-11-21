@@ -1,10 +1,10 @@
 # DesignPatternLab
 For course: *Advanced Software Development Techniques 25*
 
-# Team20 文本编辑器
+# Team20 Text Editor
 
-> 基于命令行的模块化文本编辑器 | 设计模式实践项目  
-> **团队**: Team20 | **维护者**: @team20 | **更新**: 2025-11-21
+> Command-line modular text editor | Design Patterns Practice Project  
+> **Team**: Team20 | **Maintainer**: @team20 | **Updated**: 2025-11-21
 
 ---
 

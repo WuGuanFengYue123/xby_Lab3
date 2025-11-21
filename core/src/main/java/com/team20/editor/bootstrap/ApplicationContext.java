@@ -288,7 +288,11 @@ public final class ApplicationContext {
         for (EditorProvider provider : editorProviders) {
             sb.append("  * ").append(provider.getProviderName()).append("\n");
         }
-        sb.append("- Command providers: ").append(commandRegistry.getProviders().size()).append("\n");
+        // Only access getProviders() if the registry is AutoLoadingCommandRegistry
+        if (commandRegistry instanceof AutoLoadingCommandRegistry) {
+            AutoLoadingCommandRegistry autoRegistry = (AutoLoadingCommandRegistry) commandRegistry;
+            sb.append("- Command providers: ").append(autoRegistry.getProviders().size()).append("\n");
+        }
         sb.append("- Available commands: ").append(commandRegistry.getCommandNames().size()).append("\n");
         return sb.toString();
     }
