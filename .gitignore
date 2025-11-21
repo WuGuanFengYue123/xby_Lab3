@@ -74,6 +74,8 @@ Thumbs.db
 .workspace.state
 *.log
 .*.log
+README.md.backup
+README_OLD.md
 
 # Test output
 test-output/

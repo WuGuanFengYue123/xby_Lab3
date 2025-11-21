@@ -111,10 +111,19 @@ public class JLineInteractive {
             if (input.isEmpty())
                 continue;
 
-            // Keep a short help hint, but delegate actual 'help' to command registry if
-            // implemented.
-            if ("help".equalsIgnoreCase(input)) {
-                System.out.println("输入 'help' 在主程序查看帮助（或使用 CLI 命令）");
+            // Normalize input (strip surrounding single/double quotes)
+            String normalized = normalizeInput(input);
+
+            // If user asked for help, display ApplicationContext help directly if
+            // available,
+            // otherwise fall through to usual command handling.
+            if ("help".equalsIgnoreCase(normalized)) {
+                if (context != null) {
+                    System.out.println(context.showHelp());
+                } else {
+                    // no context available — delegate to registry (if present)
+                    executeCommandLine(normalized, context, workspace);
+                }
                 continue;
             }
 
@@ -124,6 +133,16 @@ public class JLineInteractive {
             // terminate.
             // If it returns without exiting, we continue the loop.
         }
+    }
+
+    private static String normalizeInput(String input) {
+        String s = input.trim();
+        if (s.length() >= 2) {
+            if ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith("\"") && s.endsWith("\""))) {
+                s = s.substring(1, s.length() - 1).trim();
+            }
+        }
+        return s;
     }
 
     private static void simpleFallbackConsole(ApplicationContext context, Workspace workspace, Path historyFile) {
